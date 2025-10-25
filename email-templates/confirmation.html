@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Код подтверждения</title>
+    <style>
+        body {
+            font-family: Arial, Helvetica, sans-serif;
+            line-height: 1.6;
+            color: #333333;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #ffffff;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding: 20px 0;
+        }
+        .logo {
+            font-size: 24px;
+            font-weight: bold;
+            color: #FEB1FF;
+        }
+        .content {
+            background-color: #f9f9f9;
+            padding: 30px;
+            border-radius: 12px;
+            margin: 20px 0;
+        }
+        .code-container {
+            text-align: center;
+            margin: 30px 0;
+        }
+        .code-label {
+            font-size: 14px;
+            color: #666666;
+            margin-bottom: 15px;
+        }
+        .code {
+            display: inline-block;
+            font-size: 36px;
+            font-weight: bold;
+            letter-spacing: 8px;
+            color: #000000;
+            background-color: #FEB1FF;
+            padding: 15px 30px;
+            border-radius: 8px;
+            margin: 10px 0;
+            font-family: monospace;
+        }
+        .info-box {
+            background-color: #fff8e1;
+            border: 1px solid #ffc107;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 8px;
+            font-size: 14px;
+            color: #856404;
+        }
+        .footer {
+            text-align: center;
+            font-size: 12px;
+            color: #999999;
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #eeeeee;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="logo">Copella Notepad</div>
+    </div>
+    
+    <div class="content">
+        <h2 style="color: #333333; margin-top: 0;">Добро пожаловать</h2>
+        <p>Спасибо за регистрацию в Copella Notepad. Используйте этот код для подтверждения аккаунта:</p>
+        
+        <div class="code-container">
+            <div class="code-label">Ваш код подтверждения</div>
+            <div class="code">{{ .Token }}</div>
+        </div>
+        
+        <div class="info-box">
+            <strong>Важно:</strong> Код действителен 10 минут. Никому не сообщайте этот код.
+        </div>
+        
+        <p style="text-align: center; color: #666666; font-size: 14px;">
+            Введите код на странице регистрации для подтверждения вашего аккаунта.
+        </p>
+    </div>
+    
+    <div class="footer">
+        <p>Если вы не регистрировались в Copella Notepad, проигнорируйте это письмо.</p>
+    </div>
+</body>
+</html>

@@ -1,0 +1,14 @@
+{
+  "version": 2,
+  "buildCommand": "npm run build",
+  "installCommand": "npm install && npx prisma generate",
+  "framework": "sveltekit",
+  "regions": ["iad1"],
+  "env": {
+    "DATABASE_URL": "@database-url",
+    "PUBLIC_SUPABASE_URL": "@supabase-url",
+    "PUBLIC_SUPABASE_ANON_KEY": "@supabase-anon-key",
+    "PUBLIC_WS_URL": "@websocket-url"
+  }
+}
+

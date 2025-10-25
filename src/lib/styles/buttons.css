@@ -1,0 +1,197 @@
+/* Global button styles */
+.btn {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: 8px;
+	padding: 12px 16px;
+	border: none;
+	border-radius: 12px;
+	font-family: 'Gilroy', sans-serif;
+	font-weight: 600;
+	font-size: 14px;
+	line-height: 1.2;
+	cursor: pointer;
+	transition: all 0.2s ease;
+	text-decoration: none;
+	outline: none;
+	position: relative;
+	overflow: hidden;
+}
+
+.btn:focus-visible {
+	outline: 2px solid #FEB1FF;
+	outline-offset: 2px;
+}
+
+.btn:disabled {
+	opacity: 0.5;
+	cursor: not-allowed;
+}
+
+/* Button variants */
+.btn--primary {
+	background-color: #FEB1FF;
+	color: #000000;
+}
+
+.btn--primary:hover:not(:disabled) {
+	background-color: #FF9EFF;
+	color: #000000;
+	transform: translateY(-1px);
+}
+
+.btn--secondary {
+	background-color: #242424;
+	color: #7E7E7E;
+}
+
+.btn--secondary:hover:not(:disabled) {
+	background-color: #2A2A2A;
+	color: #ffffff;
+}
+
+.btn--ghost {
+	background-color: transparent;
+	color: #7E7E7E;
+}
+
+.btn--ghost:hover:not(:disabled) {
+	background-color: #242424;
+	color: #ffffff;
+}
+
+.btn--outline {
+	background-color: transparent;
+	color: #FEB1FF;
+	border: 1px solid #FEB1FF;
+}
+
+.btn--outline:hover:not(:disabled) {
+	background-color: rgba(254, 177, 255, 0.1);
+	color: #FF9EFF;
+	border-color: #FF9EFF;
+}
+
+/* Button sizes */
+.btn--sm {
+	padding: 8px 12px;
+	font-size: 12px;
+	gap: 6px;
+}
+
+.btn--lg {
+	padding: 16px 24px;
+	font-size: 16px;
+	gap: 12px;
+}
+
+.btn--icon {
+	padding: 12px;
+	width: 44px;
+	height: 44px;
+}
+
+.btn--icon-sm {
+	padding: 8px;
+	width: 36px;
+	height: 36px;
+}
+
+.btn--icon-lg {
+	padding: 16px;
+	width: 52px;
+	height: 52px;
+}
+
+.btn--full-width {
+	width: 100%;
+}
+
+/* Icon styles */
+.btn-icon {
+	width: 20px;
+	height: 20px;
+	flex-shrink: 0;
+}
+
+.btn--sm .btn-icon {
+	width: 16px;
+	height: 16px;
+}
+
+.btn--lg .btn-icon {
+	width: 24px;
+	height: 24px;
+}
+
+.btn--icon .btn-icon {
+	width: 20px;
+	height: 20px;
+}
+
+.btn--icon-sm .btn-icon {
+	width: 16px;
+	height: 16px;
+}
+
+.btn--icon-lg .btn-icon {
+	width: 24px;
+	height: 24px;
+}
+
+/* Special icon filters */
+.btn--secondary .btn-icon,
+.btn--ghost .btn-icon {
+	filter: brightness(0) invert(1);
+}
+
+.btn--primary .btn-icon {
+	filter: none;
+	opacity: 1;
+}
+
+.btn--secondary:hover .btn-icon,
+.btn--ghost:hover .btn-icon {
+	opacity: 0.7;
+}
+
+/* Loading state */
+.btn--loading {
+	pointer-events: none;
+}
+
+.btn--loading::after {
+	content: '';
+	position: absolute;
+	width: 16px;
+	height: 16px;
+	border: 2px solid transparent;
+	border-top: 2px solid currentColor;
+	border-radius: 50%;
+	animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+	0% { transform: rotate(0deg); }
+	100% { transform: rotate(360deg); }
+}
+
+/* Ripple effect */
+.btn::before {
+	content: '';
+	position: absolute;
+	top: 50%;
+	left: 50%;
+	width: 0;
+	height: 0;
+	border-radius: 50%;
+	background-color: rgba(255, 255, 255, 0.1);
+	transform: translate(-50%, -50%);
+	transition: width 0.3s ease, height 0.3s ease;
+}
+
+.btn:active::before {
+	width: 100px;
+	height: 100px;
+}

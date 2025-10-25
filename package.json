@@ -1,0 +1,49 @@
+{
+	"name": "copellanotepad",
+	"private": true,
+	"version": "0.0.1",
+	"type": "module",
+	"scripts": {
+		"dev": "vite dev",
+		"dev:ws": "tsx server/start-websocket.ts",
+		"dev:all": "concurrently \"npm run dev\" \"npm run dev:ws\"",
+		"start:ws": "node --loader tsx server/start-websocket.ts",
+		"build": "vite build",
+		"preview": "vite preview",
+		"prepare": "svelte-kit sync || echo ''",
+		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
+		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
+		"db:generate": "prisma generate",
+		"db:push": "prisma db push",
+		"db:migrate": "prisma migrate dev",
+		"db:migrate:deploy": "prisma migrate deploy",
+		"db:studio": "prisma studio",
+		"db:test": "tsx --eval \"import('./src/lib/prisma.ts').then(db => db.testPrismaConnection().then(() => console.log('✅ Prisma OK')).catch(e => console.error('❌ Prisma Error:', e)))\""
+	},
+	"devDependencies": {
+		"@sveltejs/adapter-auto": "^6.1.0",
+		"@sveltejs/kit": "^2.43.2",
+		"@sveltejs/vite-plugin-svelte": "^6.2.0",
+		"svelte": "^5.39.5",
+		"svelte-check": "^4.3.2",
+		"tsx": "^4.20.6",
+		"typescript": "^5.9.2",
+		"vite": "^7.1.7"
+	},
+	"dependencies": {
+		"@lucide/svelte": "^0.546.0",
+		"@prisma/client": "^6.17.1",
+		"@supabase/supabase-js": "^2.75.1",
+		"@types/ws": "^8.18.1",
+		"concurrently": "^8.2.2",
+		"dayjs": "^1.11.18",
+		"dotenv": "^17.2.3",
+		"iron-session": "^8.0.4",
+		"lib0": "^0.2.114",
+		"prisma": "^6.17.1",
+		"svelte-sonner": "^1.0.5",
+		"ws": "^8.18.3",
+		"yjs": "^13.6.27",
+		"zod": "^4.1.12"
+	}
+}

@@ -1,0 +1,17 @@
+services:
+  # WebSocket Server
+  - type: web
+    name: copella-websocket
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm run start:ws
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: WS_PORT
+        value: 10000
+      - key: DATABASE_URL
+        sync: false  # Будет задано вручную
+    healthCheckPath: /health
+

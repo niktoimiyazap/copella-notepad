@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Телесуфлер - Copella Notepad</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Gilroy', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #1a1a1a 0%, #2a2a2a 100%);
+            color: #ffffff;
+            line-height: 1.6;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 40px 20px;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 60px;
+        }
+
+        .logo {
+            width: 60px;
+            height: 60px;
+            margin: 0 auto 20px;
+            background: linear-gradient(135deg, #FEB1FF 0%, #FF9EFF 100%);
+            border-radius: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            font-weight: bold;
+            color: #1a1a1a;
+        }
+
+        h1 {
+            font-size: 48px;
+            font-weight: 700;
+            margin-bottom: 16px;
+            background: linear-gradient(135deg, #FEB1FF 0%, #FF9EFF 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .subtitle {
+            font-size: 18px;
+            color: #cccccc;
+            margin-bottom: 40px;
+        }
+
+        .section {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 20px;
+            padding: 40px;
+            margin-bottom: 40px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+        }
+
+        h2 {
+            font-size: 32px;
+            font-weight: 600;
+            margin-bottom: 24px;
+            color: #FEB1FF;
+        }
+
+        h3 {
+            font-size: 24px;
+            font-weight: 600;
+            margin-bottom: 16px;
+            color: #ffffff;
+        }
+
+        p {
+            margin-bottom: 16px;
+            font-size: 16px;
+            color: #e0e0e0;
+        }
+
+        .feature-list {
+            list-style: none;
+            padding: 0;
+        }
+
+        .feature-list li {
+            padding: 12px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .feature-list li:last-child {
+            border-bottom: none;
+        }
+
+        .feature-icon {
+            width: 20px;
+            height: 20px;
+            background: linear-gradient(135deg, #FEB1FF 0%, #FF9EFF 100%);
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            color: #1a1a1a;
+            font-weight: bold;
+            flex-shrink: 0;
+        }
+
+        .shortcuts {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+            margin-top: 24px;
+        }
+
+        .shortcut {
+            background: rgba(254, 177, 255, 0.1);
+            border: 1px solid rgba(254, 177, 255, 0.2);
+            border-radius: 12px;
+            padding: 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .shortcut-key {
+            background: rgba(254, 177, 255, 0.2);
+            color: #FEB1FF;
+            padding: 8px 12px;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 14px;
+        }
+
+        .shortcut-desc {
+            color: #e0e0e0;
+            font-size: 14px;
+        }
+
+        .back-button {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(254, 177, 255, 0.1);
+            border: 1px solid rgba(254, 177, 255, 0.2);
+            color: #FEB1FF;
+            padding: 12px 20px;
+            border-radius: 12px;
+            text-decoration: none;
+            font-weight: 600;
+            transition: all 0.2s ease;
+            margin-bottom: 40px;
+        }
+
+        .back-button:hover {
+            background: rgba(254, 177, 255, 0.2);
+            transform: translateY(-2px);
+        }
+
+        .highlight {
+            background: rgba(254, 177, 255, 0.1);
+            padding: 2px 6px;
+            border-radius: 4px;
+            color: #FEB1FF;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 20px 16px;
+            }
+
+            h1 {
+                font-size: 36px;
+            }
+
+            h2 {
+                font-size: 28px;
+            }
+
+            .section {
+                padding: 24px;
+            }
+
+            .shortcuts {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="/" class="back-button">
+            ← Вернуться к приложению
+        </a>
+
+        <div class="header">
+            <div class="logo">📺</div>
+            <h1>Телесуфлер</h1>
+            <p class="subtitle">Инструмент для удобного чтения текста с экрана</p>
+        </div>
+
+        <div class="section">
+            <h2>Что такое телесуфлер?</h2>
+            <p>Телесуфлер — это современный инструмент для чтения текста с экрана, который помогает вести презентации, выступления или просто удобно читать длинные тексты. Текст плавно прокручивается по экрану с настраиваемой скоростью, а специальная маска затемнения помогает сосредоточиться на текущей части текста.</p>
+        </div>
+
+        <div class="section">
+            <h2>Основные возможности</h2>
+            <ul class="feature-list">
+                <li>
+                    <div class="feature-icon">▶️</div>
+                    <span><strong>Автоматическая прокрутка</strong> — текст плавно движется по экрану с настраиваемой скоростью</span>
+                </li>
+                <li>
+                    <div class="feature-icon">🎛️</div>
+                    <span><strong>Настройка скорости</strong> — регулируйте скорость прокрутки от 10 до 100 пикселей в секунду</span>
+                </li>
+                <li>
+                    <div class="feature-icon">📏</div>
+                    <span><strong>Размер текста</strong> — изменяйте размер шрифта от 16 до 48 пикселей для комфортного чтения</span>
+                </li>
+                <li>
+                    <div class="feature-icon">🎭</div>
+                    <span><strong>Маска затемнения</strong> — специальное затемнение сверху и снизу помогает сосредоточиться на тексте</span>
+                </li>
+                <li>
+                    <div class="feature-icon">✏️</div>
+                    <span><strong>Режим редактирования</strong> — редактируйте текст прямо в телесуфлере</span>
+                </li>
+                <li>
+                    <div class="feature-icon">⌨️</div>
+                    <span><strong>Горячие клавиши</strong> — полная поддержка управления с клавиатуры</span>
+                </li>
+                <li>
+                    <div class="feature-icon">📱</div>
+                    <span><strong>Адаптивный дизайн</strong> — работает на всех устройствах</span>
+                </li>
+            </ul>
+        </div>
+
+        <div class="section">
+            <h2>Управление</h2>
+            
+            <h3>Основные кнопки</h3>
+            <ul class="feature-list">
+                <li>
+                    <div class="feature-icon">▶️</div>
+                    <span><strong>Воспроизведение/Пауза</strong> — запускает или останавливает автоматическую прокрутку</span>
+                </li>
+                <li>
+                    <div class="feature-icon">🔄</div>
+                    <span><strong>Сброс</strong> — возвращает прокрутку в начало текста</span>
+                </li>
+                <li>
+                    <div class="feature-icon">❌</div>
+                    <span><strong>Выход</strong> — закрывает телесуфлер и возвращает в редактор</span>
+                </li>
+            </ul>
+
+            <h3>Горячие клавиши</h3>
+            <div class="shortcuts">
+                <div class="shortcut">
+                    <span class="shortcut-key">Пробел</span>
+                    <span class="shortcut-desc">Воспроизведение/Пауза</span>
+                </div>
+                <div class="shortcut">
+                    <span class="shortcut-key">Esc</span>
+                    <span class="shortcut-desc">Выход из телесуфлера</span>
+                </div>
+                <div class="shortcut">
+                    <span class="shortcut-key">Home</span>
+                    <span class="shortcut-desc">Сброс в начало</span>
+                </div>
+                <div class="shortcut">
+                    <span class="shortcut-key">↑/↓</span>
+                    <span class="shortcut-desc">Ручная прокрутка</span>
+                </div>
+                <div class="shortcut">
+                    <span class="shortcut-key">Page Up/Down</span>
+                    <span class="shortcut-desc">Быстрая прокрутка</span>
+                </div>
+                <div class="shortcut">
+                    <span class="shortcut-key">Колесо мыши</span>
+                    <span class="shortcut-desc">Ручная прокрутка</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>Настройки</h2>
+            
+            <h3>Скорость прокрутки</h3>
+            <p>Используйте слайдер в правом верхнем углу для настройки скорости прокрутки текста. Диапазон: <span class="highlight">10-100 пикселей в секунду</span>.</p>
+            
+            <h3>Размер текста</h3>
+            <p>Настройте размер шрифта для комфортного чтения. Диапазон: <span class="highlight">16-48 пикселей</span>.</p>
+        </div>
+
+        <div class="section">
+            <h2>Советы по использованию</h2>
+            <ul class="feature-list">
+                <li>
+                    <div class="feature-icon">💡</div>
+                    <span>Начните с медленной скорости (20-30) и постепенно увеличивайте по мере привыкания</span>
+                </li>
+                <li>
+                    <div class="feature-icon">💡</div>
+                    <span>Используйте ручную прокрутку для точного позиционирования на нужном месте</span>
+                </li>
+                <li>
+                    <div class="feature-icon">💡</div>
+                    <span>Колесо мыши автоматически останавливает прокрутку для удобства навигации</span>
+                </li>
+                <li>
+                    <div class="feature-icon">💡</div>
+                    <span>В режиме редактирования вы можете изменять текст прямо в телесуфлере</span>
+                </li>
+                <li>
+                    <div class="feature-icon">💡</div>
+                    <span>Маска затемнения автоматически появляется только во время воспроизведения</span>
+                </li>
+            </ul>
+        </div>
+
+        <div class="section">
+            <h2>Как запустить телесуфлер</h2>
+            <p>1. Откройте любую комнату в <span class="highlight">Copella Notepad</span></p>
+            <p>2. Нажмите на кнопку <span class="highlight">📺</span> в панели инструментов редактора</p>
+            <p>3. Или используйте горячую клавишу <span class="highlight">Ctrl+T</span></p>
+            <p>4. Текст из редактора автоматически загрузится в телесуфлер</p>
+        </div>
+    </div>
+</body>
+</html>

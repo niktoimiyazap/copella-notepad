@@ -1,0 +1,113 @@
+/* Import global styles */
+@import './lib/styles/buttons.css';
+@import './lib/styles/forms.css';
+@import './lib/styles/settings.css';
+
+/* CSS Variables for sidebar dimensions */
+:root {
+	--sidebar-width: 240px;
+	--sidebar-width-collapsed: 72px;
+	--sidebar-gap: 24px;
+	--right-sidebar-width: 240px;
+	--right-sidebar-width-collapsed: 72px;
+	
+	/* Animation variables for right sidebar */
+	--right-sidebar-animation-duration: 0.3s;
+	--right-sidebar-animation-timing: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Reset and base styles */
+* {
+	margin: 0;
+	padding: 0;
+	box-sizing: border-box;
+}
+
+html, body {
+	height: 100%;
+}
+
+body {
+	font-family: 'Gilroy', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+	background-color: #121212;
+	color: #ffffff;
+	overflow: hidden;
+	-webkit-font-smoothing: antialiased;
+	-moz-osx-font-smoothing: grayscale;
+}
+
+/* App layout */
+.app {
+	display: flex;
+	width: 100vw;
+	height: 100vh;
+	overflow: hidden;
+	position: relative;
+}
+
+/* Main content */
+.main-content {
+	flex: 1;
+	height: 100vh;
+	overflow: hidden;
+	background-color: #121212;
+	transition: margin-left 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+/* Full width for docs page and auth pages */
+.main-content.full-width {
+	margin-left: 0;
+	width: 100%;
+}
+
+/* Auth page styles */
+.app.auth-page {
+	background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%);
+}
+
+.app.auth-page .main-content {
+	background: transparent;
+}
+
+/* Mobile layout adjustments */
+@media (max-width: 768px) {
+	.main-content {
+		margin-left: 0;
+	}
+}
+
+/* Global button styles */
+button {
+	font-family: inherit;
+	cursor: pointer;
+	border: none;
+	outline: none;
+}
+
+/* Global link styles */
+a {
+	color: #FEB1FF;
+	text-decoration: none;
+}
+
+a:hover {
+	text-decoration: underline;
+}
+
+/* Scrollbar styles */
+::-webkit-scrollbar {
+	width: 8px;
+}
+
+::-webkit-scrollbar-track {
+	background: #1A1A1A;
+}
+
+::-webkit-scrollbar-thumb {
+	background: #2A2A2A;
+	border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+	background: #3A3A3A;
+}

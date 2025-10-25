@@ -1,0 +1,119 @@
+/* Стили для форматирования в редакторе */
+
+/* Стили для выравнивания */
+.editor-content [style*="text-align: left"] {
+	text-align: left !important;
+}
+
+.editor-content [style*="text-align: center"] {
+	text-align: center !important;
+}
+
+.editor-content [style*="text-align: right"] {
+	text-align: right !important;
+}
+
+/* Стили для списков */
+.editor-content ul,
+.editor-content ol {
+	margin: 16px 0 !important;
+	padding-left: 24px !important;
+}
+
+.editor-content ul li,
+.editor-content ol li {
+	margin: 8px 0 !important;
+	line-height: 1.6 !important;
+}
+
+.editor-content ul {
+	list-style-type: disc !important;
+}
+
+.editor-content ol {
+	list-style-type: decimal !important;
+}
+
+.editor-content ul li::marker {
+	color: #4A9EFF !important;
+}
+
+.editor-content ol li::marker {
+	color: #4A9EFF !important;
+	font-weight: 600 !important;
+}
+
+/* Стили для заголовков (блочные элементы) */
+.editor-content h1 {
+	font-size: 2em !important;
+	font-weight: 700 !important;
+	margin: 0.67em 0 !important;
+	color: #FFFFFF !important;
+	border-bottom: 2px solid #4A9EFF !important;
+	padding-bottom: 8px !important;
+}
+
+.editor-content h2 {
+	font-size: 1.5em !important;
+	font-weight: 600 !important;
+	margin: 0.75em 0 !important;
+	color: #FFFFFF !important;
+	border-bottom: 1px solid #4A9EFF !important;
+	padding-bottom: 6px !important;
+}
+
+.editor-content h3 {
+	font-size: 1.17em !important;
+	font-weight: 600 !important;
+	margin: 0.83em 0 !important;
+	color: #FFFFFF !important;
+	border-left: 3px solid #4A9EFF !important;
+	padding-left: 12px !important;
+}
+
+/* Стили для inline размеров шрифта (когда применяется к выделенному тексту) */
+.editor-content font[size="7"] {
+	font-size: 2em !important;
+	color: #FFFFFF !important;
+}
+
+.editor-content font[size="6"] {
+	font-size: 1.5em !important;
+	color: #FFFFFF !important;
+}
+
+.editor-content font[size="5"] {
+	font-size: 1.17em !important;
+	color: #FFFFFF !important;
+}
+
+.editor-content font[size="3"] {
+	font-size: 1em !important;
+	color: #FFFFFF !important;
+}
+
+/* Стили для форматированного текста */
+.editor-content b,
+.editor-content strong {
+	font-weight: 600 !important;
+	color: #FFFFFF !important;
+}
+
+.editor-content i,
+.editor-content em {
+	font-style: italic !important;
+	color: #E0E0E0 !important;
+}
+
+.editor-content u {
+	text-decoration: underline !important;
+	text-decoration-color: #4A9EFF !important;
+	text-decoration-thickness: 2px !important;
+}
+
+.editor-content s,
+.editor-content strike {
+	text-decoration: line-through !important;
+	text-decoration-color: #FF6B6B !important;
+	text-decoration-thickness: 2px !important;
+}

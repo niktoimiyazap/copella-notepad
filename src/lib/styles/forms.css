@@ -1,0 +1,175 @@
+/* Global form styles */
+.form-group {
+	display: flex;
+	flex-direction: column;
+	gap: 12px;
+}
+
+.form-label {
+	font-family: 'Gilroy', sans-serif;
+	font-weight: 600;
+	font-size: 16px;
+	color: #ffffff;
+}
+
+.form-input {
+	background: #2A2A2A;
+	border: 1px solid #3A3A3A;
+	border-radius: 12px;
+	padding: 16px;
+	font-family: 'Gilroy', sans-serif;
+	font-size: 16px;
+	color: #ffffff;
+	transition: all 0.2s ease;
+}
+
+.form-input:focus {
+	outline: none;
+	border-color: #3A3A3A;
+	box-shadow: none;
+}
+
+.form-input::placeholder {
+	color: #888888;
+}
+
+.form-input:disabled {
+	opacity: 0.6;
+	cursor: not-allowed;
+}
+
+/* Button groups */
+.button-group {
+	display: flex;
+	gap: 12px;
+}
+
+/* Type selection buttons */
+.type-button {
+	flex: 1;
+	display: flex;
+	align-items: center;
+	gap: 16px;
+	padding: 16px;
+	background: #2A2A2A;
+	border: 2px solid #3A3A3A;
+	border-radius: 12px;
+	cursor: pointer;
+	transition: all 0.2s ease;
+	font-family: 'Gilroy', sans-serif;
+}
+
+.type-button:hover:not(:disabled):not(.type-button--active) {
+	border-color: #3A3A3A;
+	background: #2A2A2A;
+}
+
+.type-button--active {
+	border-color: #FEB1FF;
+	background: #FEB1FF;
+}
+
+.type-button:disabled {
+	opacity: 0.6;
+	cursor: not-allowed;
+}
+
+.type-icon {
+	width: 32px;
+	height: 32px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	color: #888888;
+	transition: color 0.2s ease;
+}
+
+.type-button:hover:not(:disabled):not(.type-button--active) .type-icon {
+	color: #888888;
+}
+
+.type-button--active .type-icon {
+	color: #000000;
+}
+
+.type-text {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+	text-align: left;
+}
+
+.type-title {
+	font-weight: 600;
+	font-size: 16px;
+	color: #ffffff;
+}
+
+.type-description {
+	font-weight: 400;
+	font-size: 14px;
+	color: #888888;
+}
+
+.type-button--active .type-title {
+	color: #000000;
+}
+
+.type-button--active .type-description {
+	color: #333333;
+}
+
+/* Upload areas */
+.cover-upload-section {
+	width: 100%;
+}
+
+.cover-upload-area {
+	width: 100%;
+	aspect-ratio: 16 / 9;
+	background: #2A2A2A;
+	border: 2px dashed #3A3A3A;
+	border-radius: 12px;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	gap: 12px;
+	cursor: pointer;
+	transition: all 0.2s ease;
+}
+
+.cover-upload-area:hover {
+	border-color: #FEB1FF;
+	background: #2A2A2A;
+}
+
+.upload-icon {
+	width: 48px;
+	height: 48px;
+	color: #888888;
+	transition: color 0.2s ease;
+}
+
+.cover-upload-area:hover .upload-icon {
+	color: #FEB1FF;
+}
+
+.upload-text {
+	font-family: 'Gilroy', sans-serif;
+	font-weight: 600;
+	font-size: 16px;
+	color: #888888;
+	transition: color 0.2s ease;
+}
+
+.cover-upload-area:hover .upload-text {
+	color: #FEB1FF;
+}
+
+.upload-subtext {
+	font-family: 'Gilroy', sans-serif;
+	font-weight: 400;
+	font-size: 14px;
+	color: #666666;
+}

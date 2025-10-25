@@ -1,0 +1,395 @@
+/* Импорт универсальных анимаций */
+@import './sidebar-animations.css';
+
+/* Sidebar base styles */
+.sidebar {
+	position: relative;
+	height: 100vh;
+	background-color: #1A1A1A;
+	display: flex;
+	flex-direction: column;
+	overflow: hidden;
+	border-right: 1px solid #2A2A2A;
+	z-index: 100;
+	animation: fadeIn 0.3s ease-in-out;
+}
+
+@keyframes fadeIn {
+	from {
+		opacity: 0;
+	}
+	to {
+		opacity: 1;
+	}
+}
+
+.sidebar:hover {
+	/* Тень убрана */
+}
+
+/* Mini sidebar state */
+.sidebar--mini {
+	width: 72px;
+}
+
+/* Expanded sidebar state */
+.sidebar--expanded {
+	width: 240px;
+}
+
+/* Mobile sidebar states */
+.sidebar--mobile {
+	position: fixed;
+	left: 0;
+	top: 0;
+	z-index: 1000;
+	transform: translateX(-100%);
+	width: 280px;
+}
+
+.sidebar--mobile-open {
+	transform: translateX(0);
+}
+
+/* Sidebar header */
+.sidebar-header {
+	padding: 20px;
+	border-bottom: 1px solid #2A2A2A;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+}
+
+.sidebar--expanded .sidebar-header {
+	justify-content: flex-start;
+}
+
+.sidebar-logo {
+	transition: all var(--sidebar-duration) var(--sidebar-easing);
+	object-fit: contain;
+	cursor: pointer;
+	border-radius: 4px;
+}
+
+.sidebar-logo:hover {
+	opacity: 0.8;
+	transform: scale(1.05);
+}
+
+.sidebar-logo:focus {
+	outline: 2px solid #4A90E2;
+	outline-offset: 2px;
+}
+
+.sidebar--mini .sidebar-logo {
+	width: 32px;
+	height: 32px;
+}
+
+.sidebar--expanded .sidebar-logo {
+	width: 160px;
+	height: 40px;
+}
+
+/* Sidebar navigation */
+.sidebar-nav {
+	flex: 1;
+	padding: 20px 16px;
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+}
+
+.sidebar--expanded .sidebar-nav {
+	padding: 20px;
+}
+
+/* Navigation buttons */
+.nav-button {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	padding: 12px;
+	background-color: #242424;
+	border: none;
+	border-radius: 12px;
+	color: #7E7E7E;
+	font-family: 'Gilroy', sans-serif;
+	font-weight: 600;
+	font-size: 14px;
+	line-height: 1.2;
+	cursor: pointer;
+	width: 100%;
+	text-align: left;
+	position: relative;
+	overflow: hidden;
+	box-shadow: none;
+}
+
+.nav-button:hover {
+	background-color: #2A2A2A;
+	color: #ffffff;
+	transform: translateY(-1px);
+}
+
+/* Исправление для мини-сайдбара - убираем transform для кнопок с абсолютно позиционированными иконками */
+.sidebar--mini .nav-button:hover {
+	transform: none;
+}
+
+.nav-button:hover .nav-icon {
+	opacity: 1;
+	transform: scale(1.1);
+}
+
+/* Исправление для мини-сайдбара - убираем scale для абсолютно позиционированных иконок */
+.sidebar--mini .nav-button:hover .nav-icon {
+	transform: translate(-50%, -50%);
+}
+
+.nav-button--primary {
+	background-color: #FEB1FF;
+	color: #000000;
+}
+
+.nav-button--primary:hover {
+	background-color: #FF9EFF;
+	color: #000000;
+}
+
+/* Mini sidebar button styles */
+.sidebar--mini .nav-button {
+	justify-content: center;
+	padding: 12px;
+	width: 40px;
+	height: 40px;
+	position: relative;
+}
+
+.sidebar--mini .nav-button span {
+	opacity: 0;
+	width: 0;
+	overflow: hidden;
+	transition: opacity 0.2s ease 0.1s, width 0.2s ease 0.1s;
+}
+
+/* Center icons in mini sidebar */
+.sidebar--mini .nav-icon {
+	margin: 0;
+	position: absolute;
+	left: 50%;
+	top: 50%;
+	transform: translate(-50%, -50%);
+}
+
+.sidebar--expanded .nav-button span {
+	opacity: 1;
+	width: auto;
+}
+
+/* Navigation icons */
+.nav-icon {
+	width: 20px;
+	height: 20px;
+	filter: brightness(0) invert(1);
+	flex-shrink: 0;
+	opacity: 0.5;
+}
+
+.nav-button--primary .nav-icon {
+	filter: none;
+	opacity: 1;
+}
+
+.nav-button:has(.nav-icon[src*="door-closed"]) .nav-icon {
+	width: 18px;
+	height: 18px;
+}
+
+.nav-button:has(.nav-icon[src*="log-out"]) .nav-icon {
+	width: 16px;
+	height: 16px;
+}
+
+/* Rooms list */
+.rooms-list {
+	margin-top: 8px;
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+}
+
+.sidebar--mini .rooms-list {
+	display: none;
+}
+
+.room-item {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	padding: 12px 16px;
+	background-color: #242424;
+	border-radius: 12px;
+	cursor: pointer;
+	position: relative;
+	overflow: hidden;
+}
+
+.room-item:hover {
+	background-color: #2A2A2A;
+	transform: translateY(-1px);
+}
+
+.room-icon {
+	width: 18px;
+	height: 18px;
+	filter: brightness(0) invert(0.5);
+	flex-shrink: 0;
+}
+
+.room-item span {
+	color: #7E7E7E;
+	font-family: 'Gilroy', sans-serif;
+	font-weight: 600;
+	font-size: 14px;
+	line-height: 1.2;
+}
+
+.room-item:hover span {
+	color: #ffffff;
+}
+
+.room-item:hover .room-icon {
+	filter: brightness(0) invert(1);
+}
+
+/* Sidebar footer */
+.sidebar-footer {
+	padding: 20px 16px;
+	border-top: 1px solid #2A2A2A;
+	display: flex;
+	flex-direction: column;
+	gap: 12px;
+}
+
+.sidebar--expanded .sidebar-footer {
+	padding: 20px;
+}
+
+/* User info */
+.user-info {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	margin-bottom: 8px;
+}
+
+.sidebar--mini .user-info {
+	justify-content: center;
+	position: relative;
+}
+
+.sidebar--mini .user-info .user-nickname {
+	opacity: 0;
+	width: 0;
+	overflow: hidden;
+}
+
+/* Avatar positioning moved to UserAvatar.svelte component */
+
+/* User avatar styles moved to UserAvatar.svelte component */
+
+.user-nickname {
+	color: #ffffff;
+	font-family: 'Gilroy', sans-serif;
+	font-weight: 600;
+	font-size: 14px;
+	line-height: 1.2;
+}
+
+
+/* Tooltip for mini sidebar */
+.sidebar--mini .nav-button::after {
+	content: attr(data-tooltip);
+	position: absolute;
+	left: 100%;
+	top: 50%;
+	transform: translateY(-50%);
+	background-color: #1A1A1A;
+	color: #ffffff;
+	padding: 8px 12px;
+	border-radius: 8px;
+	font-size: 12px;
+	white-space: nowrap;
+	opacity: 0;
+	pointer-events: none;
+	transition: opacity 0.2s var(--sidebar-easing);
+	z-index: 1000;
+	margin-left: 8px;
+	border: 1px solid #2A2A2A;
+}
+
+.sidebar--mini .nav-button:hover::after {
+	opacity: 1;
+}
+
+/* Burger button */
+.burger-button {
+	position: fixed;
+	top: 20px;
+	left: 20px;
+	z-index: 1001;
+	width: 44px;
+	height: 44px;
+	background-color: #1A1A1A;
+	border: 1px solid #2A2A2A;
+	border-radius: 12px;
+	cursor: pointer;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	gap: 4px;
+	box-shadow: none;
+	
+	transition: 
+		background-color 0.2s var(--sidebar-animation-timing-smooth, cubic-bezier(0.4, 0, 0.2, 1)),
+		border-color 0.2s var(--sidebar-animation-timing-smooth, cubic-bezier(0.4, 0, 0.2, 1)),
+		transform 0.2s var(--sidebar-animation-timing-smooth, cubic-bezier(0.4, 0, 0.2, 1));
+}
+
+.burger-button:hover {
+	background-color: #242424;
+	border-color: #3A3A3A;
+	transform: translateY(-1px);
+	box-shadow: none;
+}
+
+.burger-button span {
+	width: 18px;
+	height: 2px;
+	background-color: #ffffff;
+	border-radius: 1px;
+	transition: all var(--sidebar-duration) var(--sidebar-easing);
+}
+
+/* Sidebar backdrop */
+.sidebar-backdrop {
+	position: fixed;
+	top: 0;
+	left: 0;
+	width: 100vw;
+	height: 100vh;
+	background-color: rgba(0, 0, 0, 0.3);
+	z-index: 999;
+	backdrop-filter: blur(8px);
+	-webkit-backdrop-filter: blur(8px);
+}
+
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+	.sidebar:not(.sidebar--mobile) {
+		display: none;
+	}
+}

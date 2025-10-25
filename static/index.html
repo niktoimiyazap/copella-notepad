@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Документация - Copella Notepad</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Gilroy', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #1a1a1a 0%, #2a2a2a 100%);
+            color: #ffffff;
+            line-height: 1.6;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 40px 20px;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 60px;
+        }
+
+        .logo {
+            width: 80px;
+            height: 80px;
+            margin: 0 auto 20px;
+            background: linear-gradient(135deg, #FEB1FF 0%, #FF9EFF 100%);
+            border-radius: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 32px;
+            font-weight: bold;
+            color: #1a1a1a;
+        }
+
+        h1 {
+            font-size: 56px;
+            font-weight: 700;
+            margin-bottom: 16px;
+            background: linear-gradient(135deg, #FEB1FF 0%, #FF9EFF 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .subtitle {
+            font-size: 20px;
+            color: #cccccc;
+            margin-bottom: 40px;
+        }
+
+        .back-button {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(254, 177, 255, 0.1);
+            border: 1px solid rgba(254, 177, 255, 0.2);
+            color: #FEB1FF;
+            padding: 12px 20px;
+            border-radius: 12px;
+            text-decoration: none;
+            font-weight: 600;
+            transition: all 0.2s ease;
+            margin-bottom: 40px;
+        }
+
+        .back-button:hover {
+            background: rgba(254, 177, 255, 0.2);
+            transform: translateY(-2px);
+        }
+
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 30px;
+            margin-bottom: 60px;
+        }
+
+        .feature-card {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 20px;
+            padding: 40px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            transition: all 0.3s ease;
+            cursor: pointer;
+            text-decoration: none;
+            color: inherit;
+            display: block;
+        }
+
+        .feature-card:hover {
+            transform: translateY(-5px);
+            border-color: rgba(254, 177, 255, 0.3);
+            background: rgba(255, 255, 255, 0.08);
+        }
+
+        .feature-icon {
+            width: 60px;
+            height: 60px;
+            background: linear-gradient(135deg, #FEB1FF 0%, #FF9EFF 100%);
+            border-radius: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 28px;
+            margin-bottom: 20px;
+        }
+
+        .feature-title {
+            font-size: 24px;
+            font-weight: 600;
+            margin-bottom: 12px;
+            color: #FEB1FF;
+        }
+
+        .feature-description {
+            color: #e0e0e0;
+            font-size: 16px;
+            line-height: 1.6;
+        }
+
+        .coming-soon {
+            background: rgba(255, 255, 255, 0.02);
+            border-radius: 20px;
+            padding: 40px;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            text-align: center;
+        }
+
+        .coming-soon h2 {
+            font-size: 32px;
+            font-weight: 600;
+            margin-bottom: 16px;
+            color: #FEB1FF;
+        }
+
+        .coming-soon p {
+            color: #cccccc;
+            font-size: 18px;
+        }
+
+        .coming-soon-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-top: 30px;
+        }
+
+        .coming-soon-item {
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 12px;
+            padding: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .coming-soon-item h3 {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: #ffffff;
+        }
+
+        .coming-soon-item p {
+            color: #aaaaaa;
+            font-size: 14px;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 20px 16px;
+            }
+
+            h1 {
+                font-size: 42px;
+            }
+
+            .features-grid {
+                grid-template-columns: 1fr;
+                gap: 20px;
+            }
+
+            .feature-card {
+                padding: 30px;
+            }
+
+            .coming-soon-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="/" class="back-button">
+            ← Вернуться к приложению
+        </a>
+
+        <div class="header">
+            <div class="logo">📝</div>
+            <h1>Документация</h1>
+            <p class="subtitle">Полное руководство по использованию Copella Notepad</p>
+        </div>
+
+        <div class="features-grid">
+            <a href="/documentation/teleprompter" class="feature-card">
+                <div class="feature-icon">📺</div>
+                <h3 class="feature-title">Телесуфлер</h3>
+                <p class="feature-description">
+                    Инструмент для удобного чтения текста с экрана. Автоматическая прокрутка, настройка скорости, 
+                    маска затемнения и полная поддержка горячих клавиш.
+                </p>
+            </a>
+
+            <div class="feature-card" style="cursor: default; opacity: 0.6;">
+                <div class="feature-icon">👥</div>
+                <h3 class="feature-title">Комнаты и совместная работа</h3>
+                <p class="feature-description">
+                    Создавайте комнаты, приглашайте участников и работайте над заметками вместе. 
+                    Реальное время, история изменений и управление доступом.
+                </p>
+            </div>
+
+            <div class="feature-card" style="cursor: default; opacity: 0.6;">
+                <div class="feature-icon">✏️</div>
+                <h3 class="feature-title">Редактор текста</h3>
+                <p class="feature-description">
+                    Мощный редактор с поддержкой форматирования, тегов, упоминаний и горячих клавиш. 
+                    Автосохранение и синхронизация в реальном времени.
+                </p>
+            </div>
+
+            <div class="feature-card" style="cursor: default; opacity: 0.6;">
+                <div class="feature-icon">🏷️</div>
+                <h3 class="feature-title">Теги и упоминания</h3>
+                <p class="feature-description">
+                    Используйте цветные теги для организации контента и упоминания участников 
+                    для быстрой коммуникации и уведомлений.
+                </p>
+            </div>
+        </div>
+
+        <div class="coming-soon">
+            <h2>Скоро будет доступно</h2>
+            <p>Мы активно работаем над расширением документации и добавлением новых функций.</p>
+            
+            <div class="coming-soon-grid">
+                <div class="coming-soon-item">
+                    <h3>API и интеграции</h3>
+                    <p>Документация по API для разработчиков</p>
+                </div>
+                <div class="coming-soon-item">
+                    <h3>Расширенные настройки</h3>
+                    <p>Персонализация интерфейса и настроек</p>
+                </div>
+                <div class="coming-soon-item">
+                    <h3>Экспорт и импорт</h3>
+                    <p>Работа с файлами различных форматов</p>
+                </div>
+                <div class="coming-soon-item">
+                    <h3>Мобильное приложение</h3>
+                    <p>Руководство по использованию на мобильных устройствах</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

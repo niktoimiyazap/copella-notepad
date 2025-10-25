@@ -1,0 +1,179 @@
+/* ========================================
+   СОВРЕМЕННЫЕ АНИМАЦИИ САЙДБАРА
+   ======================================== */
+
+/* CSS переменные для анимаций */
+:root {
+	--sidebar-duration: 0.3s;
+	--sidebar-easing: cubic-bezier(0.4, 0, 0.2, 1); /* Material Design easing */
+	--sidebar-easing-smooth: cubic-bezier(0.25, 0.46, 0.45, 0.94); /* Более плавная кривая */
+}
+
+/* ========================================
+   БАЗОВЫЕ АНИМАЦИИ САЙДБАРА
+   ======================================== */
+
+/* Плавная анимация ширины */
+.sidebar {
+	transition: width var(--sidebar-duration) var(--sidebar-easing);
+}
+
+/* Анимация transform для мобильных устройств */
+.sidebar--mobile {
+	transition: transform var(--sidebar-duration) var(--sidebar-easing);
+}
+
+/* ========================================
+   АНИМАЦИИ КОНТЕНТА
+   ======================================== */
+
+/* Анимации заголовка сайдбара */
+.sidebar-header {
+	transition: 
+		padding var(--sidebar-duration) var(--sidebar-easing),
+		justify-content var(--sidebar-duration) var(--sidebar-easing);
+}
+
+/* Анимации контента сайдбара */
+.sidebar-nav,
+.sidebar-footer {
+	transition: padding var(--sidebar-duration) var(--sidebar-easing);
+}
+
+/* ========================================
+   АНИМАЦИИ КНОПОК И ЭЛЕМЕНТОВ
+   ======================================== */
+
+/* Базовые анимации кнопок */
+.nav-button,
+.room-item {
+	transition: 
+		background-color 0.2s var(--sidebar-easing),
+		transform 0.2s var(--sidebar-easing),
+		color 0.2s var(--sidebar-easing);
+}
+
+.nav-button:hover,
+.room-item:hover {
+	background-color: #2A2A2A;
+	transform: translateY(-1px);
+}
+
+/* Исправление для мини-сайдбара - убираем transform для кнопок с абсолютно позиционированными иконками */
+.sidebar--mini .nav-button:hover {
+	transform: none;
+}
+
+/* Анимации иконок - оптимизированные */
+.nav-icon,
+.room-icon {
+	transition: 
+		opacity 0.2s var(--sidebar-easing),
+		transform 0.2s var(--sidebar-easing),
+		filter 0.2s var(--sidebar-easing);
+}
+
+.nav-button:hover .nav-icon,
+.room-item:hover .room-icon {
+	opacity: 1;
+	transform: scale(1.05);
+}
+
+/* Исправление для мини-сайдбара - убираем scale для абсолютно позиционированных иконок */
+.sidebar--mini .nav-button:hover .nav-icon {
+	transform: translate(-50%, -50%);
+}
+
+/* ========================================
+   АНИМАЦИИ ТЕКСТА
+   ======================================== */
+
+/* Плавное появление/исчезновение текста - оптимизированное */
+.nav-button span,
+.user-nickname {
+	transition: 
+		opacity 0.2s var(--sidebar-easing) 0.1s,
+		width 0.2s var(--sidebar-easing) 0.1s,
+		transform 0.2s var(--sidebar-easing) 0.1s;
+}
+
+.sidebar--mini .nav-button span,
+.sidebar--mini .user-nickname {
+	opacity: 0;
+	width: 0;
+	overflow: hidden;
+}
+
+/* ========================================
+   BACKDROP АНИМАЦИИ
+   ======================================== */
+
+/* Анимация backdrop для мобильных устройств */
+.sidebar-backdrop {
+	animation: backdropFadeIn var(--sidebar-duration) var(--sidebar-easing);
+}
+
+@keyframes backdropFadeIn {
+	from {
+		opacity: 0;
+		backdrop-filter: blur(0px);
+	}
+	to {
+		opacity: 1;
+		backdrop-filter: blur(4px);
+	}
+}
+
+/* ========================================
+   МОБИЛЬНЫЕ АНИМАЦИИ
+   ======================================== */
+
+/* Плавное появление сайдбара на мобильных */
+.sidebar--mobile-open {
+	animation: mobileSlideIn var(--sidebar-duration) var(--sidebar-easing);
+}
+
+@keyframes mobileSlideIn {
+	from {
+		opacity: 0;
+		transform: translateX(-100%) scale(0.98);
+	}
+	to {
+		opacity: 1;
+		transform: translateX(0) scale(1);
+	}
+}
+
+/* ========================================
+   КРАСИВЫЕ HOVER ЭФФЕКТЫ
+   ======================================== */
+
+/* Эффект при нажатии */
+.nav-button:active,
+.room-item:active {
+	transform: translateY(0) scale(0.98);
+	transition: transform 0.1s var(--sidebar-easing);
+}
+
+/* ========================================
+   ДОСТУПНОСТЬ
+   ======================================== */
+
+/* Отключение анимаций для пользователей с настройками доступности */
+@media (prefers-reduced-motion: reduce) {
+	.sidebar,
+	.sidebar-header,
+	.sidebar-nav,
+	.sidebar-footer,
+	.nav-button,
+	.room-item,
+	.nav-icon,
+	.room-icon,
+	.nav-button span,
+	.user-nickname,
+	.sidebar-backdrop,
+	.sidebar--mobile {
+		transition: none !important;
+		animation: none !important;
+	}
+}

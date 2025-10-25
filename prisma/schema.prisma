@@ -1,0 +1,197 @@
+// Prisma schema для Copella Notepad
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Модель пользователя
+model User {
+  id         String   @id @default(cuid())
+  email      String   @unique
+  fullName   String
+  username   String   @unique
+  avatarUrl  String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  // Связи
+  createdRooms      Room[]            @relation("RoomCreator")
+  roomParticipants  RoomParticipant[]
+  createdNotes      Note[]            @relation("NoteCreator")
+  sentInvites       RoomInvite[]      @relation("RoomInviter")
+  requestedInvites  RoomInvite[]      @relation("RoomRequester")
+  sessions          Session[]
+  settings          UserSettings?
+}
+
+// Модель комнаты
+model Room {
+  id               String   @id @default(cuid())
+  title            String
+  description      String?
+  isPublic         Boolean  @default(false)
+  coverImageUrl    String?
+  participantLimit Int      @default(10)
+  createdBy        String
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  // Настройки разрешений для участников
+  allowEdit        Boolean  @default(true)   // Участники могут редактировать заметки
+  allowInvite      Boolean  @default(true)   // Участники могут приглашать других
+  allowDelete      Boolean  @default(false)  // Участники могут удалять заметки
+  requireApproval  Boolean  @default(false)  // Требовать одобрения новых участников
+  timeRestricted   Boolean  @default(false)  // Ограничение доступа по времени
+  accessUntil      DateTime?                  // Дата окончания доступа
+
+  // Связи
+  creator      User              @relation("RoomCreator", fields: [createdBy], references: [id], onDelete: Cascade)
+  participants RoomParticipant[]
+  notes        Note[]
+  invites      RoomInvite[]
+}
+
+// Модель участника комнаты
+model RoomParticipant {
+  id        String   @id @default(cuid())
+  roomId    String
+  userId    String
+  role      String   @default("participant") // "creator", "admin", "participant"
+  joinedAt  DateTime @default(now())
+  lastSeen  DateTime @default(now())
+  isOnline  Boolean  @default(false)
+
+  // Индивидуальные права участника (если null - используются настройки комнаты)
+  canEdit   Boolean?
+  canInvite Boolean?
+  canDelete Boolean?
+
+  // Связи
+  room Room @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([roomId, userId])
+}
+
+// Модель заметки
+model Note {
+  id        String   @id @default(cuid())
+  roomId    String
+  title     String
+  content   String?
+  createdBy String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Связи
+  room     Room     @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  creator  User?    @relation("NoteCreator", fields: [createdBy], references: [id], onDelete: SetNull)
+  noteTags NoteTag[]
+}
+
+// Модель тега
+model Tag {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  color     String   @default("#3B82F6")
+  createdAt DateTime @default(now())
+
+  // Связи
+  noteTags NoteTag[]
+}
+
+// Связь многие-ко-многим между заметками и тегами
+model NoteTag {
+  noteId String
+  tagId  String
+
+  // Связи
+  note Note @relation(fields: [noteId], references: [id], onDelete: Cascade)
+  tag  Tag  @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([noteId, tagId])
+}
+
+// Модель приглашений в комнаты
+model RoomInvite {
+  id          String   @id @default(cuid())
+  roomId      String
+  invitedBy   String   // ID пользователя, который отправил приглашение
+  requestedBy String?  // ID пользователя, который подал заявку (для pending_approval)
+  inviteToken String   @unique // Уникальный токен для приглашения
+  status      String   @default("pending") // "pending", "accepted", "declined", "expired", "pending_approval"
+  expiresAt   DateTime // Время истечения приглашения
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Связи
+  room      Room  @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  inviter   User  @relation("RoomInviter", fields: [invitedBy], references: [id], onDelete: Cascade)
+  requester User? @relation("RoomRequester", fields: [requestedBy], references: [id], onDelete: Cascade)
+
+  @@index([inviteToken])
+  @@index([roomId])
+  @@index([status])
+  @@index([requestedBy])
+}
+
+// Модель сессий пользователей
+model Session {
+  id             String    @id @default(cuid())
+  userId         String
+  token          String    @unique
+  expiresAt      DateTime
+  userAgent      String?
+  ipAddress      String?
+  lastActivityAt DateTime  @default(now())
+  createdAt      DateTime  @default(now())
+
+  // Связи
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([token])
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+// Модель настроек пользователя
+model UserSettings {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  bio       String?
+
+  // Notification settings
+  emailNotifications        Boolean @default(true)
+  mentionNotifications      Boolean @default(true)
+  inviteNotifications       Boolean @default(true)
+  commentNotifications      Boolean @default(true)
+  roomActivityNotifications Boolean @default(false)
+  browserNotifications      Boolean @default(false)
+  soundEnabled              Boolean @default(true)
+
+  // Privacy settings
+  profileVisibility  String  @default("public")
+  showOnlineStatus   Boolean @default(true)
+  allowInvites       Boolean @default(true)
+  allowMentions      Boolean @default(true)
+  showActivityStatus Boolean @default(true)
+
+  // Appearance settings
+  theme              String  @default("dark")
+  accentColor        String  @default("#FEB1FF")
+  fontSize           String  @default("medium")
+  compactMode        Boolean @default(false)
+  animationsEnabled  Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Связи
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
