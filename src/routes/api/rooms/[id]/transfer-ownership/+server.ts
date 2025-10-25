@@ -2,7 +2,7 @@ import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { prisma } from '$lib/prisma';
 import { getCurrentUserFromToken } from '$lib/utils/userManagement';
-import { notifyRoomWebSocket } from '$lib/websocket-notify';
+import { notifyParticipantUpdate } from '$lib/websocket-notify';
 
 // POST /api/rooms/[id]/transfer-ownership - передать права владельца другому пользователю
 export const POST: RequestHandler = async ({ params, request, cookies }) => {
@@ -127,12 +127,12 @@ export const POST: RequestHandler = async ({ params, request, cookies }) => {
 			});
 
 			// Уведомляем всех участников комнаты об обновлении
-			await notifyRoomWebSocket(roomId, 'participant_update', {
+			await notifyParticipantUpdate(roomId, {
 				action: 'ownership_transferred',
 				oldOwnerId: user.id,
 				newOwnerId,
 				participants: updatedParticipants
-			});
+			}, 'ownership_transferred');
 
 			console.log(`[Transfer Ownership] WebSocket notification sent for room ${roomId}`);
 		} catch (wsError) {
