@@ -137,10 +137,10 @@ export async function updateUserOnlineStatus(userId: string, roomId: string, isO
       }
     });
 
-    // Если участник не существует, возвращаем ошибку
-    // НЕ создаем участника автоматически - это должно делаться явно при присоединении к комнате
+    // Если участник не существует, возвращаем более информативную ошибку
     if (!existingParticipant) {
-      return { error: 'Пользователь не является участником комнаты' };
+      console.error(`[updateUserOnlineStatus] User ${userId} is not a participant in room ${roomId}`);
+      return { error: 'User is not a participant in this room' };
     }
 
     // Обновляем статус существующего участника

@@ -1,6 +1,7 @@
-
-
-const WS_SERVER_URL = 'http://localhost:3001/notify';
+// URL WebSocket сервера для отправки уведомлений через HTTP API
+// В production это должен быть URL Render сервера
+// В dev это localhost
+const WS_SERVER_URL = process.env.WS_SERVER_URL || 'http://localhost:3001/notify';
 
 interface ApprovalResponseNotification {
   type: 'approval_response';

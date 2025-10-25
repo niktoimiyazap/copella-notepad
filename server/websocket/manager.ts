@@ -18,7 +18,44 @@ export class WebSocketManager {
   private diffSyncHandler: DiffSyncHandler;
 
   constructor(server: any) {
-    this.wss = new WebSocketServer({ server });
+    // Список разрешенных origins для WebSocket
+    const ALLOWED_ORIGINS = [
+      'http://localhost:5173',
+      'http://localhost:5174', 
+      'https://localhost:5173',
+      process.env.PUBLIC_FRONTEND_URL,
+    ].filter(Boolean);
+
+    // Настройка WebSocketServer с проверкой origin
+    this.wss = new WebSocketServer({ 
+      server,
+      // Проверка origin перед установкой соединения
+      verifyClient: (info) => {
+        const origin = info.origin || info.req.headers.origin;
+        
+        // В dev режиме разрешаем все
+        if (process.env.NODE_ENV !== 'production') {
+          return true;
+        }
+        
+        // В production проверяем список разрешенных origins
+        if (!origin) {
+          console.warn('[WebSocketManager] No origin header in request');
+          return true; // Разрешаем, если origin не указан (некоторые клиенты могут не отправлять)
+        }
+        
+        const isAllowed = ALLOWED_ORIGINS.some(allowed => 
+          allowed && origin.startsWith(allowed)
+        );
+        
+        if (!isAllowed) {
+          console.warn(`[WebSocketManager] Origin not allowed: ${origin}`);
+        }
+        
+        return isAllowed || !origin;
+      }
+    });
+    
     this.connectionHandler = new ConnectionHandler();
     this.inviteHandler = new InviteHandler(this.connectionHandler);
     this.onlineStatusHandler = new OnlineStatusHandler(this.connectionHandler);

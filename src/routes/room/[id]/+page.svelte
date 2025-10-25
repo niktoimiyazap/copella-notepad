@@ -142,30 +142,38 @@
 				roomData.notes = notes;
 			}
 
-			// Инициализируем отслеживание онлайн статуса участников
-			// И ждем подключения к WebSocket ПЕРЕД показом интерфейса
-			if ($currentUser?.id) {
-				// Отключаем старое соединение если оно есть
-			if (disconnectOnlineTracking) {
-				disconnectOnlineTracking();
-			}
+		// Инициализируем отслеживание онлайн статуса участников
+		// И ждем подключения к WebSocket ПЕРЕД показом интерфейса
+		// ТОЛЬКО если пользователь является участником комнаты
+		if ($currentUser?.id) {
+			// Проверяем, является ли пользователь участником комнаты
+			const isParticipant = roomData.participants.some(p => p.userId === $currentUser.id);
 			
-			try {
-				// Ждем подключения к WebSocket и получения начальных данных
-				disconnectOnlineTracking = await initParticipantsOnlineTracking(
-					roomId,
-					$currentUser.id,
-					() => roomData.participants as any[],
-					(updatedParticipants) => {
-						roomData.participants = updatedParticipants as Participant[];
-					}
-				);
-			} catch (wsError) {
-				console.error('WebSocket connection error:', wsError);
-				// Продолжаем работу даже если WebSocket не подключился
-				// (пользователь сможет работать с комнатой, но без real-time обновлений)
+			if (isParticipant) {
+				// Отключаем старое соединение если оно есть
+				if (disconnectOnlineTracking) {
+					disconnectOnlineTracking();
+				}
+				
+				try {
+					// Ждем подключения к WebSocket и получения начальных данных
+					disconnectOnlineTracking = await initParticipantsOnlineTracking(
+						roomId,
+						$currentUser.id,
+						() => roomData.participants as any[],
+						(updatedParticipants) => {
+							roomData.participants = updatedParticipants as Participant[];
+						}
+					);
+				} catch (wsError) {
+					console.error('WebSocket connection error:', wsError);
+					// Продолжаем работу даже если WebSocket не подключился
+					// (пользователь сможет работать с комнатой, но без real-time обновлений)
+				}
+			} else {
+				console.log('[Room] User is not a participant, skipping WebSocket connection');
 			}
-			}
+		}
 
 			// Скрываем загрузку после подключения к WebSocket
 			showLoading = false;
@@ -441,29 +449,37 @@
 				roomData.notes = notes;
 			}
 
-			// Инициализируем отслеживание онлайн статуса участников
-			// И ждем подключения к WebSocket ПЕРЕД показом интерфейса
-			if ($currentUser?.id) {
-			// Отключаем старое соединение если оно есть
-			if (disconnectOnlineTracking) {
-				disconnectOnlineTracking();
-			}
+		// Инициализируем отслеживание онлайн статуса участников
+		// И ждем подключения к WebSocket ПЕРЕД показом интерфейса
+		// ТОЛЬКО если пользователь является участником комнаты
+		if ($currentUser?.id) {
+			// Проверяем, является ли пользователь участником комнаты
+			const isParticipant = roomData.participants.some(p => p.userId === $currentUser.id);
 			
-			try {
-				// Ждем подключения к WebSocket и получения начальных данных
-				disconnectOnlineTracking = await initParticipantsOnlineTracking(
-					roomId,
-					$currentUser.id,
-					() => roomData.participants as any[],
-					(updatedParticipants) => {
-						roomData.participants = updatedParticipants as Participant[];
-					}
-				);
-			} catch (wsError) {
-				console.error('WebSocket reconnection error:', wsError);
-				// Продолжаем работу даже если WebSocket не подключился
+			if (isParticipant) {
+				// Отключаем старое соединение если оно есть
+				if (disconnectOnlineTracking) {
+					disconnectOnlineTracking();
+				}
+				
+				try {
+					// Ждем подключения к WebSocket и получения начальных данных
+					disconnectOnlineTracking = await initParticipantsOnlineTracking(
+						roomId,
+						$currentUser.id,
+						() => roomData.participants as any[],
+						(updatedParticipants) => {
+							roomData.participants = updatedParticipants as Participant[];
+						}
+					);
+				} catch (wsError) {
+					console.error('WebSocket reconnection error:', wsError);
+					// Продолжаем работу даже если WebSocket не подключился
+				}
+			} else {
+				console.log('[Room] User is not a participant, skipping WebSocket reconnection');
 			}
-			}
+		}
 
 			// Скрываем загрузку после подключения к WebSocket
 			showLoading = false;

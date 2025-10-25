@@ -124,11 +124,15 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
 				}
 			});
 
-			// Добавляем создателя как участника с ролью "creator"
-			await tx.$executeRaw`
-				INSERT INTO RoomParticipant (id, roomId, userId, role, isOnline, joinedAt, lastSeen)
-				VALUES (${crypto.randomUUID()}, ${room.id}, ${user.id}, 'creator', true, datetime('now'), datetime('now'))
-			`;
+		// Добавляем создателя как участника с ролью "creator"
+		await tx.roomParticipant.create({
+			data: {
+				roomId: room.id,
+				userId: user.id,
+				role: 'creator',
+				isOnline: true
+			}
+		});
 
 			// Создаем первую заметку автоматически
 			await tx.note.create({

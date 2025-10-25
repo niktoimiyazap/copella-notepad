@@ -37,6 +37,13 @@
 	setContext('isLeftSidebarOpen', () => isLeftSidebarOpen);
 	setContext('isMobile', () => isMobile);
 	
+	// Функция для обновления высоты viewport (важно для мобильных браузеров)
+	function updateViewportHeight() {
+		// Получаем реальную высоту окна браузера
+		const vh = window.innerHeight * 0.01;
+		document.documentElement.style.setProperty('--app-height', `${window.innerHeight}px`);
+	}
+	
 	// Инициализируем пользователя из серверных данных при монтировании
 	// Это происходит один раз и предотвращает "мерцание" UI
 	onMount(() => {
@@ -49,14 +56,46 @@
 		windowWidth = window.innerWidth;
 		isMobile = windowWidth <= 768;
 		
+		// Устанавливаем правильную высоту viewport при загрузке
+		updateViewportHeight();
+		
 		const handleResize = () => {
 			windowWidth = window.innerWidth;
+			// Обновляем высоту viewport при изменении размера окна
+			updateViewportHeight();
+		};
+		
+		// Обработчик для iOS Safari (когда появляется/исчезает адресная строка)
+		const handleOrientationChange = () => {
+			updateViewportHeight();
 		};
 		
 		window.addEventListener('resize', handleResize);
+		window.addEventListener('orientationchange', handleOrientationChange);
+		
+		// Также обновляем при скролле (для некоторых мобильных браузеров)
+		let ticking = false;
+		const handleScroll = () => {
+			if (!ticking) {
+				window.requestAnimationFrame(() => {
+					updateViewportHeight();
+					ticking = false;
+				});
+				ticking = true;
+			}
+		};
+		
+		// На мобильных устройствах следим за scroll для обновления высоты
+		if (isMobile) {
+			window.addEventListener('scroll', handleScroll, { passive: true });
+		}
 		
 		return () => {
 			window.removeEventListener('resize', handleResize);
+			window.removeEventListener('orientationchange', handleOrientationChange);
+			if (isMobile) {
+				window.removeEventListener('scroll', handleScroll);
+			}
 		};
 	});
 	

@@ -122,7 +122,11 @@ export class ConnectionHandler {
     // Проверяем успешность операции
     if (statusResult.error) {
       console.error(`[ConnectionHandler] Failed to update online status for user ${userId}:`, statusResult.error);
-      this.sendError(ws, 'Failed to join room');
+      // Более информативная ошибка для случая, когда пользователь не является участником
+      const errorMessage = statusResult.error.includes('not a participant')
+        ? 'You are not a participant in this room'
+        : 'Failed to join room';
+      this.sendError(ws, errorMessage);
       return;
     }
 

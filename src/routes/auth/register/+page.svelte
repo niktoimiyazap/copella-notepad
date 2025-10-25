@@ -3,6 +3,7 @@
 	import { currentUser } from '$lib/stores/user';
 	import { goto } from '$app/navigation';
 	import { onMount } from 'svelte';
+	import { supabase } from '$lib/supabase';
 	import RegisterStep1A from '$lib/components/forms/RegisterStep1A.svelte';
 	import RegisterStep1B from '$lib/components/forms/RegisterStep1B.svelte';
 	import RegisterStep2 from '$lib/components/forms/RegisterStep2.svelte';

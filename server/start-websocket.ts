@@ -8,8 +8,47 @@ import { setWebSocketManager } from '../src/lib/websocket-singleton.js';
 
 const PORT = process.env.WS_PORT || 3001;
 
+// Список разрешенных origins для CORS
+const ALLOWED_ORIGINS = [
+  'http://localhost:5173',
+  'http://localhost:5174',
+  'https://localhost:5173',
+  process.env.PUBLIC_FRONTEND_URL, // URL фронтенда на Vercel
+].filter(Boolean); // Убираем undefined значения
+
+// Функция для добавления CORS заголовков
+function setCorsHeaders(res: any, req: any) {
+  const origin = req.headers.origin || req.headers.referer;
+  
+  // Разрешаем все origins в dev режиме, или проверяем список в production
+  if (process.env.NODE_ENV !== 'production' || !origin) {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+  } else {
+    const isAllowed = ALLOWED_ORIGINS.some(allowed => 
+      allowed && origin.startsWith(allowed)
+    );
+    if (isAllowed) {
+      res.setHeader('Access-Control-Allow-Origin', origin);
+    }
+  }
+  
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+}
+
 // Создаем HTTP сервер для WebSocket
 const server = createServer((req, res) => {
+  // Добавляем CORS заголовки для всех запросов
+  setCorsHeaders(res, req);
+  
+  // Обработка preflight запросов
+  if (req.method === 'OPTIONS') {
+    res.writeHead(204);
+    res.end();
+    return;
+  }
+  
   // Простой health check endpoint
   if (req.url === '/health') {
     res.writeHead(200, { 'Content-Type': 'application/json' });
