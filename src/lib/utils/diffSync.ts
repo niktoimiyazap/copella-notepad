@@ -360,19 +360,14 @@ export class DiffSyncManager {
     }
     
     // КРИТИЧНО: Дополнительная валидация Yjs update
-    // Минимальный валидный Yjs update должен быть хотя бы 3 байта
-    if (update.length < 3) {
+    // Минимальный валидный Yjs update должен быть хотя бы 2 байта
+    if (update.length < 2) {
       console.warn('[YjsSync] Ignoring too small update (corrupted?):', update.length, 'bytes');
       return;
     }
     
-    // Проверяем что update содержит реальные изменения
-    // Пустой Yjs update обычно имеет длину 2-3 байта и содержит только служебную информацию
-    // Реальные изменения обычно >= 10 байт
-    if (update.length < 5) {
-      console.warn('[YjsSync] Ignoring minimal update (no real changes)');
-      return;
-    }
+    // Логируем для отладки
+    console.log('[YjsSync] Sending update:', update.length, 'bytes');
     
     this.isSyncing = true;
     this.onSyncStatus('syncing');
@@ -459,8 +454,8 @@ export class DiffSyncManager {
         return;
       }
       
-      // Awareness update должен содержать данные (минимум 5 байт)
-      if (awarenessUpdate.length < 5) {
+      // Awareness update должен содержать данные (минимум 2 байта)
+      if (awarenessUpdate.length < 2) {
         console.warn('[YjsSync] Too small awareness update, skipping');
         return;
       }
