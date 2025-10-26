@@ -1,5 +1,5 @@
 // Обработчик приглашений и заявок в реальном времени
-import { prisma } from '../../../src/lib/prisma.js';
+import { prisma } from '../../database/prisma.js';
 import type { WebSocketMessage, RoomInviteData } from '../types.js';
 import type { ConnectionHandler } from './connectionHandler.js';
 

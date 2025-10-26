@@ -1,10 +1,8 @@
 // Обработчик синхронизации контента заметок в реальном времени
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../../database/prisma.js';
 import type { ConnectionHandler } from './connectionHandler.js';
 import type { WebSocketMessage } from '../types.js';
 import type { WebSocket } from 'ws';
-
-const prisma = new PrismaClient();
 
 interface NoteContentUpdate {
   noteId: string;

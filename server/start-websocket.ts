@@ -6,6 +6,7 @@ import 'dotenv/config';
 import { createServer } from 'http';
 import { WebSocketManager } from './websocket/index.js';
 import { setWebSocketManager } from '../src/lib/websocket-singleton.js';
+import { testConnection } from './database/prisma.js';
 
 const PORT = process.env.WS_PORT || 3001;
 
@@ -121,22 +122,41 @@ const server = createServer((req, res) => {
   res.end();
 });
 
-// Создаем WebSocket Manager
-const wsManager = new WebSocketManager(server);
+// Функция для запуска сервера с проверкой БД
+async function startServer() {
+  // Проверяем подключение к базе данных
+  const dbConnected = await testConnection();
+  if (!dbConnected) {
+    console.error('[WebSocket Server] Failed to connect to database. Exiting...');
+    process.exit(1);
+  }
 
-// Сохраняем в globalThis для доступа из HTTP обработчика
-(globalThis as any).wsManager = wsManager;
+  // Создаем WebSocket Manager
+  const wsManager = new WebSocketManager(server);
 
-// Регистрируем в singleton для использования в API endpoints
-setWebSocketManager(wsManager);
+  // Сохраняем в globalThis для доступа из HTTP обработчика
+  (globalThis as any).wsManager = wsManager;
 
-// Экспортируем для использования в других местах
-export { wsManager };
+  // Регистрируем в singleton для использования в API endpoints
+  setWebSocketManager(wsManager);
+
+  // Экспортируем для использования в других местах
+  // @ts-ignore
+  globalThis.wsManagerExport = wsManager;
+
+  // Запускаем сервер
+  server.listen(PORT, () => {
+    console.log(`[WebSocket Server] Listening on port ${PORT}`);
+  });
+  
+  return wsManager;
+}
 
 // Запускаем сервер
-server.listen(PORT, () => {
-  console.log(`[WebSocket Server] Listening on port ${PORT}`);
-});
+const wsManagerPromise = startServer();
+
+// Экспортируем для использования в других местах
+export const wsManager = await wsManagerPromise;
 
 // Graceful shutdown
 let isShuttingDown = false;

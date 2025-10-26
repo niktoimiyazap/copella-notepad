@@ -1,10 +1,8 @@
 // Real-time collaborative editing с использованием Yjs (CRDT)
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../../database/prisma.js';
 import type { ConnectionHandler } from './connectionHandler.js';
 import type { WebSocket } from 'ws';
 import * as Y from 'yjs';
-
-const prisma = new PrismaClient();
 
 interface CursorPosition {
   noteId: string;

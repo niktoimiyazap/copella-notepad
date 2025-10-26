@@ -1,6 +1,6 @@
 // Аутентификация для WebSocket
 import { supabase } from '../../src/lib/supabase-server.js';
-import { prisma } from '../../src/lib/prisma.js';
+import { prisma } from '../database/prisma.js';
 import type { AuthResult } from './types.js';
 
 /**

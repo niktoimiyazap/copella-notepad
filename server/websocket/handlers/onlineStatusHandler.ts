@@ -1,5 +1,5 @@
 // Обработчик статуса онлайн пользователей
-import { prisma } from '../../../src/lib/prisma.js';
+import { prisma } from '../../database/prisma.js';
 import type { WebSocketMessage } from '../types.js';
 import type { ConnectionHandler } from './connectionHandler.js';
 
