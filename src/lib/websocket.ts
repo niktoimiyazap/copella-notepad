@@ -87,6 +87,8 @@ class WebSocketClient {
 
       // Подключаемся к WebSocket серверу (глобально, без присоединения к комнате)
       const wsBaseUrl = import.meta.env.PUBLIC_WS_URL || 'ws://localhost:3001';
+      console.log('[WebSocket] PUBLIC_WS_URL from env:', import.meta.env.PUBLIC_WS_URL);
+      console.log('[WebSocket] Using wsBaseUrl:', wsBaseUrl);
       const wsUrl = `${wsBaseUrl}?token=${token}`;
       this.ws = new WebSocket(wsUrl);
 
@@ -162,6 +164,8 @@ class WebSocketClient {
 
       // Подключаемся к WebSocket серверу
       const wsBaseUrl = import.meta.env.PUBLIC_WS_URL || 'ws://localhost:3001';
+      console.log('[WebSocket] PUBLIC_WS_URL from env:', import.meta.env.PUBLIC_WS_URL);
+      console.log('[WebSocket] Using wsBaseUrl:', wsBaseUrl);
       const wsUrl = `${wsBaseUrl}?token=${token}`;
       this.ws = new WebSocket(wsUrl);
 
