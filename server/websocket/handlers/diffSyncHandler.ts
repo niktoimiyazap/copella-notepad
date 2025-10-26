@@ -3,6 +3,7 @@ import { prisma } from '../../database/prisma.js';
 import type { ConnectionHandler } from './connectionHandler.js';
 import type { WebSocket } from 'ws';
 import * as Y from 'yjs';
+import { WebrtcProvider } from 'y-webrtc';
 import { ServerBatcher } from '../serverBatcher.js';
 
 interface CursorPosition {
@@ -17,6 +18,7 @@ interface CursorPosition {
 
 // Хранилище Yjs документов для каждой заметки
 const noteDocs = new Map<string, Y.Doc>();
+const webrtcProviders = new Map<string, WebrtcProvider>(); // WebRTC провайдеры для каждой заметки
 const pendingSaves = new Map<string, NodeJS.Timeout>();
 const SAVE_DELAY = 2000; // 2 секунды задержка перед сохранением
 
@@ -51,7 +53,7 @@ export class DiffSyncHandler {
       // Загружаем заметку из БД
       const note = await prisma.note.findUnique({
         where: { id: noteId },
-        select: { content: true }
+        select: { content: true, roomId: true }
       });
 
       if (!note) {
@@ -74,6 +76,49 @@ export class DiffSyncHandler {
 
       // Сохраняем в памяти
       noteDocs.set(noteId, ydoc);
+
+      // Подключаем сервер к WebRTC P2P сети
+      // Сервер станет peer и будет получать все изменения для сохранения в БД
+      try {
+        const webrtcProvider = new WebrtcProvider(
+          `copella-room-${note.roomId}-note-${noteId}`, // Та же комната что и у клиентов
+          ydoc,
+          {
+            // Signaling серверы (те же что на клиенте)
+            signaling: [
+              'wss://signaling.yjs.dev',
+              'wss://y-webrtc-signaling-eu.herokuapp.com',
+              'wss://y-webrtc-signaling-us.herokuapp.com'
+            ],
+            // STUN серверы для NAT traversal
+            peerOpts: {
+              config: {
+                iceServers: [
+                  { urls: 'stun:stun.l.google.com:19302' },
+                  { urls: 'stun:stun1.l.google.com:19302' },
+                  { urls: 'stun:stun2.l.google.com:19302' }
+                ]
+              }
+            },
+            maxConns: 50 // Больше на сервере
+          }
+        );
+
+        webrtcProvider.on('synced', () => {
+          console.log(`[WebRTC Server] ✅ Connected as peer for note ${noteId}`);
+        });
+
+        webrtcProvider.on('peers', (event: { webrtcPeers: string[] }) => {
+          console.log(`[WebRTC Server] Note ${noteId}: ${event.webrtcPeers.length} peers`);
+        });
+
+        // Сохраняем провайдер
+        webrtcProviders.set(noteId, webrtcProvider);
+        console.log(`[WebRTC Server] 🚀 Initialized as peer for note ${noteId}`);
+      } catch (error) {
+        console.error('[WebRTC Server] ❌ Failed to initialize provider:', error);
+        // Не критично - сервер продолжит работать через WebSocket
+      }
 
       return ydoc;
     } catch (error) {

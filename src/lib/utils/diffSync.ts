@@ -58,47 +58,18 @@ export class DiffSyncManager {
   // Курсоры других пользователей
   private remoteCursors = new Map<string, CursorInfo>();
   
-  // WebSocket (используется для fallback и сохранения в БД)
+  // WebSocket (только для уведомлений о сохранении, не для синхронизации)
   private messageHandler: ((message: any) => void) | null = null;
-  
-  // Отслеживание типа соединения для оптимизации
-  private connectionType: 'webrtc' | 'websocket' = 'websocket';
-  private webrtcConnected = false;
 
   // Батчинг для обновлений контента (адаптивный для мобильных)
   private pendingContentUpdate: string | null = null;
   private contentUpdateTimeout: ReturnType<typeof setTimeout> | null = null;
   private isMobile: boolean = isMobileDevice();
   
-  // Батчинг для Yjs updates (группируем несколько изменений в один update)
-  private pendingUpdates: Uint8Array[] = [];
-  private updateBatchTimeout: ReturnType<typeof setTimeout> | null = null;
-  private readonly UPDATE_BATCH_DELAY = 50; // 50ms задержка для батчинга updates
 
   // Защита от зацикливания (флаг обновления)
   private updateInProgress = false;
   
-  // Батчинг для cursor updates (только для мобильных)
-  private cursorBatcher: WebSocketBatcher | null = null;
-  private lastCursorUpdate: number = 0;
-  private cursorThrottle: number;
-  
-  // Отслеживание последней позиции курсора для предотвращения дублирующих обновлений
-  private lastCursorPosition: number = -1;
-  private lastCursorSelection: { start: number; end: number } | undefined = undefined;
-  
-  // Throttling для awareness updates
-  private lastAwarenessUpdate: number = 0;
-  private awarenessThrottle: number; // Адаптивный throttle: 30ms для мобильных, 50ms для десктопа
-  private pendingAwarenessUpdate: ReturnType<typeof setTimeout> | null = null;
-
-  // Мониторинг качества соединения
-  private pingStartTime: number = 0;
-  private latencyHistory: number[] = []; // История последних 10 измерений
-  private readonly MAX_LATENCY_HISTORY = 10;
-  private currentLatency: number = 0;
-  private connectionQuality: ConnectionQuality = 'excellent';
-  private latencyCheckInterval: ReturnType<typeof setInterval> | null = null;
 
   // Цвета для пользователей
   private userColors = new Map<string, string>();
@@ -116,22 +87,6 @@ export class DiffSyncManager {
     this.onCursorsUpdate = options.onCursorsUpdate;
     this.onSyncStatus = options.onSyncStatus;
 
-    // Адаптивный throttle для курсора и awareness
-    // На мобильных: 50ms для курсора, 30ms для awareness (оптимально для 4G, как в инструкции)
-    // На десктопе: 50ms для обоих (оптимально для real-time, как в Figma)
-    this.cursorThrottle = this.isMobile ? 50 : 50; // Снижено с 100ms до 50ms для мобильных
-    this.awarenessThrottle = this.isMobile ? 30 : 50; // 30ms для мобильных для быстрой синхронизации
-
-    // Создаем батчер для cursor updates (только для мобильных)
-    if (this.isMobile) {
-      this.cursorBatcher = new WebSocketBatcher((messages) => {
-        // Отправляем только последнее обновление курсора из батча
-        const lastCursor = messages[messages.length - 1];
-        if (lastCursor && websocketClient) {
-          websocketClient.send(lastCursor);
-        }
-      });
-    }
 
     // Создаем Yjs документ
     this.ydoc = new Y.Doc();
@@ -180,32 +135,27 @@ export class DiffSyncManager {
 
         // Отслеживание состояния WebRTC подключения
         this.webrtcProvider.on('synced', () => {
-          console.log('[WebRTC] ✅ Synced with peers');
-          this.webrtcConnected = true;
-          this.connectionType = 'webrtc';
+          console.log('[WebRTC] ✅ Synced with peers via P2P');
+          this.isInitialized = true;
           this.onSyncStatus('connected');
         });
 
         this.webrtcProvider.on('peers', (event: { added: string[], removed: string[], webrtcPeers: string[] }) => {
-          console.log(`[WebRTC] Peers changed: ${event.webrtcPeers.length} active`);
+          console.log(`[WebRTC] 🔗 ${event.webrtcPeers.length} peers connected (P2P)`);
           
-          // Если есть хотя бы один peer через WebRTC, используем его
           if (event.webrtcPeers.length > 0) {
-            this.webrtcConnected = true;
-            this.connectionType = 'webrtc';
-          } else {
-            // Нет P2P соединений - fallback на WebSocket
-            this.webrtcConnected = false;
-            this.connectionType = 'websocket';
-            console.log('[WebRTC] ⚠️ No P2P peers, falling back to WebSocket');
+            this.onSyncStatus('connected');
           }
         });
 
-        console.log('[WebRTC] 🚀 P2P provider initialized');
+        console.log('[WebRTC] 🚀 P2P provider initialized (no WebSocket fallback)');
+        
+        // Отмечаем как инициализированный сразу
+        this.isInitialized = true;
       } catch (error) {
-        console.error('[WebRTC] ❌ Failed to initialize, using WebSocket fallback:', error);
+        console.error('[WebRTC] ❌ Failed to initialize P2P:', error);
         this.webrtcProvider = null;
-        this.connectionType = 'websocket';
+        this.onSyncStatus('error');
       }
     }
 
@@ -238,130 +188,45 @@ export class DiffSyncManager {
       }
     });
 
-    // Подписываемся на updates для отправки на сервер
-    this.ydoc.on('update', (update: Uint8Array, origin: any) => {
-      // Не отправляем updates которые пришли с сервера (origin === 'server')
-      if (origin !== 'server' && this.isInitialized) {
-        this.sendUpdate(update);
-      }
-    });
-    
     // Подписываемся на изменения Awareness для синхронизации курсоров
+    // WebRTC автоматически синхронизирует awareness, нам нужно только обновлять UI
     this.awareness.on('change', () => {
       this.handleAwarenessChange();
     });
-    
-    // Подписываемся на awareness updates для отправки на сервер
-    this.awareness.on('update', ({ added, updated, removed }: any) => {
-      // Отправляем awareness update только если это локальное изменение
-      const changedClients = [...added, ...updated, ...removed];
-      if (changedClients.includes(this.awareness.clientID)) {
-        this.sendAwarenessUpdate();
-      }
-    });
 
-    this.initialize();
+    // Подписываемся на WebSocket только для уведомлений о сохранении
+    this.initializeWebSocketNotifications();
   }
 
   /**
-   * Инициализация WebSocket соединения
+   * Инициализация WebSocket только для уведомлений (не для синхронизации)
    */
-  private async initialize() {
+  private initializeWebSocketNotifications() {
     try {
       if (!websocketClient) {
-        throw new Error('WebSocket client not available');
+        console.warn('[WebSocket] Client not available for notifications');
+        return;
       }
       
-      // Подписываемся на сообщения для Yjs синхронизации
+      // Подписываемся ТОЛЬКО на уведомление о сохранении в БД
       this.messageHandler = (message: any) => {
-        this.handleWebSocketMessage(message);
+        if (message.type === 'note_saved' && message.data.noteId === this.noteId) {
+          console.log('[WebSocket] ✅ Note saved to database');
+          this.onSyncStatus('saved');
+          setTimeout(() => {
+            if (this.isActive) {
+              this.onSyncStatus('connected');
+            }
+          }, 2000);
+        }
       };
       
-      // Подписываемся на сообщения
-      websocketClient.onMessage('yjs_sync', this.messageHandler);
-      websocketClient.onMessage('yjs_update', this.messageHandler);
-      websocketClient.onMessage('awareness_update', this.messageHandler);
-      // cursor_update и cursor_remove больше не нужны - awareness уже содержит эту информацию
       websocketClient.onMessage('note_saved', this.messageHandler);
-      websocketClient.onMessage('latency_pong', this.messageHandler); // Обработка pong для latency
       
-      // Обрабатываем переподключение WebSocket
-      websocketClient.onMessage('reconnected', async () => {
-        await this.reconnect();
-      });
-
-      // Запрашиваем начальное состояние документа
-      await this.requestSync();
-      
-      // Запускаем мониторинг качества соединения
-      this.startLatencyMonitoring();
-      
-      this.onSyncStatus('connected');
+      console.log('[WebSocket] 📢 Listening for save notifications only');
     } catch (error) {
-      console.error('[YjsSync] Initialization error:', error);
-      this.onSyncStatus('error');
-    }
-  }
-  
-  /**
-   * Переподключение после потери соединения
-   */
-  public async reconnect() {
-    if (!this.isActive) return;
-    
-    this.isInitialized = false;
-    this.onSyncStatus('syncing');
-    
-    try {
-      // Запрашиваем полную синхронизацию заново
-      await this.requestSync();
-      this.onSyncStatus('connected');
-    } catch (error) {
-      console.error('[YjsSync] Reconnect error:', error);
-      this.onSyncStatus('error');
-    }
-  }
-
-  /**
-   * Обработка WebSocket сообщений
-   */
-  private handleWebSocketMessage(message: any) {
-    try {
-      switch (message.type) {
-        case 'yjs_sync':
-          this.handleYjsSync(message.data);
-          break;
-        
-        case 'yjs_update':
-          this.handleYjsUpdate(message.data);
-          break;
-        
-        case 'awareness_update':
-          this.handleAwarenessUpdate(message.data);
-          break;
-        
-        // cursor_update и cursor_remove удалены - awareness уже содержит информацию о курсорах
-        
-        case 'note_saved':
-          if (message.data.noteId === this.noteId) {
-            this.onSyncStatus('saved');
-            setTimeout(() => {
-              if (this.isActive && !this.isSyncing) {
-                this.onSyncStatus('connected');
-              }
-            }, 2000);
-          }
-          break;
-        
-        case 'latency_pong':
-          // Обрабатываем pong для вычисления latency
-          if (message.data?.timestamp) {
-            this.handleLatencyPong(message.data.timestamp);
-          }
-          break;
-      }
-    } catch (error) {
-      console.error('[YjsSync] Error handling message:', error);
+      console.error('[WebSocket] Notifications initialization error:', error);
+      // Не критично - WebRTC продолжит работать
     }
   }
 
