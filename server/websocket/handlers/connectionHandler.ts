@@ -217,8 +217,12 @@ export class ConnectionHandler {
 
     for (const [connectionId, user] of this.connectedUsers.entries()) {
       if (user.ws === ws) {
-        const [userId, roomId] = connectionId.split('-');
-        connectionsToRemove.push({ userId, roomId });
+        // ВАЖНО: Используем userId и roomId из объекта user, а не парсим connectionId
+        // потому что userId содержит дефисы и split('-') даст неправильный результат
+        connectionsToRemove.push({ 
+          userId: user.userId, 
+          roomId: user.roomId 
+        });
       }
     }
 
