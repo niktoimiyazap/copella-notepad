@@ -768,14 +768,13 @@
 	
 	function handleMouseMove() {
 		// Обновляем позицию курсора в реальном времени только если идёт выделение
-		// Используем throttling чтобы не вызывать слишком часто
 		if (isMouseDown && !mouseMoveThrottleTimeout) {
 			updateCursorPosition(true); // immediate = true для мгновенного обновления
 			
-			// Ограничиваем частоту обновлений до 50мс (20 раз в секунду)
+			// Минимальный throttle для предотвращения перегрузки (10ms = 100 обновлений в секунду)
 			mouseMoveThrottleTimeout = setTimeout(() => {
 				mouseMoveThrottleTimeout = null;
-			}, 50);
+			}, 10);
 		}
 	}
 	

@@ -283,8 +283,8 @@
 		left: 0;
 		pointer-events: none;
 		will-change: transform;
-		/* Плавное движение курсора как в Figma - интерполяция позиции */
-		transition: transform 150ms cubic-bezier(0.4, 0.0, 0.2, 1);
+		/* Мгновенное отслеживание курсора для real-time синхронизации */
+		transition: transform 30ms linear;
 	}
 
 	.cursor-line {
@@ -340,8 +340,8 @@
 		opacity: 0.2;
 		pointer-events: none;
 		will-change: transform, width, height;
-		/* Плавное изменение выделения */
-		transition: transform 100ms ease-out, width 100ms ease-out, height 100ms ease-out, opacity 200ms ease-out;
+		/* Быстрое обновление выделения для real-time синхронизации */
+		transition: transform 30ms linear, width 30ms linear, height 30ms linear, opacity 200ms ease-out;
 	}
 </style>
 
