@@ -68,6 +68,9 @@ const sessionOptions = {
  */
 export async function ensureUserProfile(authUser: User): Promise<{ user: any; error: string | null }> {
   try {
+    // Логируем попытку поиска пользователя (без чувствительных данных)
+    console.log(`[ensureUserProfile] Looking up user profile for ID: ${authUser.id.slice(0, 8)}...`);
+    
     // Сначала проверяем, существует ли пользователь
     let userData = await prisma.user.findUnique({
       where: { id: authUser.id }
@@ -75,6 +78,7 @@ export async function ensureUserProfile(authUser: User): Promise<{ user: any; er
 
     // Если пользователь не найден, создаем его
     if (!userData) {
+      console.log(`[ensureUserProfile] User not found, creating new profile`);
       userData = await prisma.user.create({
         data: {
           id: authUser.id,
@@ -84,6 +88,9 @@ export async function ensureUserProfile(authUser: User): Promise<{ user: any; er
           avatarUrl: authUser.user_metadata?.avatar_url || null
         }
       });
+      console.log(`[ensureUserProfile] User profile created successfully`);
+    } else {
+      console.log(`[ensureUserProfile] User profile found`);
     }
 
     return {
@@ -96,8 +103,27 @@ export async function ensureUserProfile(authUser: User): Promise<{ user: any; er
       },
       error: null
     };
-  } catch (error) {
-    console.error('Error ensuring user profile:', error);
+  } catch (error: any) {
+    // Детальное логирование ошибки для диагностики
+    console.error('[ensureUserProfile] Error details:', {
+      name: error?.name,
+      message: error?.message,
+      code: error?.code,
+      meta: error?.meta,
+      clientVersion: error?.clientVersion,
+      stack: error?.stack?.split('\n').slice(0, 3).join('\n') // Первые 3 строки стека
+    });
+    
+    // Специальная обработка ошибок подключения к БД
+    if (error?.message?.includes('Tenant or user not found') || 
+        error?.code === 'P1001' || 
+        error?.code === 'P1002') {
+      return {
+        user: null,
+        error: 'Ошибка подключения к базе данных. Проверьте DATABASE_URL.'
+      };
+    }
+    
     return {
       user: null,
       error: 'Ошибка создания профиля пользователя'
