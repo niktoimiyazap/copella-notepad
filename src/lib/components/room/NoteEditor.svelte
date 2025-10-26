@@ -116,6 +116,9 @@
 			// Обновляем последний ID
 			lastSyncManagerNoteId = currentNoteId;
 			
+			// ВАЖНО: Очищаем курсоры при смене заметки
+			remoteCursors = new Map();
+			
 			// Очищаем старый менеджер
 			if (diffSyncManager) {
 				diffSyncManager.destroy();
@@ -164,7 +167,16 @@
 					applyRemoteContentUpdate(newContent);
 				},
 				onCursorsUpdate: (cursors) => {
-					remoteCursors = cursors;
+					// КРИТИЧНО: Фильтруем курсоры только для ТЕКУЩЕЙ заметки
+					const filteredCursors = new Map<string, CursorInfo>();
+					for (const [userId, cursor] of cursors.entries()) {
+						// Показываем курсор только если он для текущей заметки
+						if (cursor.noteId === currentNoteId) {
+							filteredCursors.set(userId, cursor);
+						}
+					}
+					
+					remoteCursors = filteredCursors;
 					
 					// Обновляем статус редактирования с дебоунсингом
 					if (editingStatusTimeout) {
@@ -172,10 +184,10 @@
 					}
 					
 					// Показываем статус только если есть активные курсоры
-					if (cursors.size > 0) {
+					if (filteredCursors.size > 0) {
 						isBeingEdited = true;
 					} else {
-						// Скрываем статус с задержкой 500мс (было 2000)
+						// Скрываем статус с задержкой 500мс
 						editingStatusTimeout = setTimeout(() => {
 							if (remoteCursors.size === 0) {
 								isBeingEdited = false;
@@ -195,9 +207,30 @@
 		if (editorElement) {
 			editorElement.focus();
 		}
+		
+		// Слушаем события visibility для скрытия курсора когда страница неактивна
+		const handleVisibilityChange = () => {
+			if (document.hidden) {
+				// Страница скрыта (телефон погас, свернули вкладку) - убираем курсор
+				if (diffSyncManager) {
+					diffSyncManager.updateCursor(-1);
+				}
+			}
+		};
+		
+		document.addEventListener('visibilitychange', handleVisibilityChange);
+		
+		return () => {
+			document.removeEventListener('visibilitychange', handleVisibilityChange);
+		};
 	});
 
 	onDestroy(() => {
+		// ВАЖНО: Удаляем курсор перед уничтожением компонента
+		if (diffSyncManager) {
+			diffSyncManager.updateCursor(-1);
+		}
+		
 		// Очищаем таймеры при размонтировании
 		if (cursorUpdateTimeout) {
 			clearTimeout(cursorUpdateTimeout);
@@ -220,6 +253,9 @@
 			diffSyncManager.destroy();
 			diffSyncManager = null;
 		}
+		
+		// Очищаем все курсоры
+		remoteCursors = new Map();
 	});
 
 	// Функция для применения отложенного обновления от сервера

@@ -344,9 +344,8 @@ export class DiffSyncManager {
    * Обработка удаления курсора (когда пользователь убирает фокус)
    */
   private handleCursorRemove(data: { noteId?: string; userId: string }) {
-    if (data.noteId && data.noteId !== this.noteId) return;
-    
-    // Удаляем курсор пользователя
+    // Удаляем курсор пользователя безусловно
+    // Это гарантирует что курсор исчезнет при blur/visibility change
     this.remoteCursors.delete(data.userId);
     this.onCursorsUpdate(new Map(this.remoteCursors));
   }
