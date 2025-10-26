@@ -147,11 +147,11 @@
 						return;
 					}
 					
-					// Throttle: не обновляем DOM чаще чем раз в 100ms
+					// Throttle: не обновляем DOM чаще чем раз в 50ms для быстрого отклика
 					const now = Date.now();
 					const timeSinceLastUpdate = now - lastRemoteUpdateTime;
 					
-					if (timeSinceLastUpdate < 100 && !isFocused) {
+					if (timeSinceLastUpdate < 50 && !isFocused) {
 						// Сохраняем pending обновление
 						pendingRemoteUpdate = newContent;
 						
@@ -159,7 +159,7 @@
 						if (!remoteUpdateTimeout) {
 							remoteUpdateTimeout = setTimeout(() => {
 								applyRemoteUpdate();
-							}, 100 - timeSinceLastUpdate);
+							}, 50 - timeSinceLastUpdate);
 						}
 						return;
 					}
@@ -362,7 +362,7 @@
 			if (pendingRemoteUpdate) {
 				applyRemoteUpdate();
 			}
-		}, 200); // 200мс - короткая пауза между символами, но достаточная для батчинга
+		}, 100); // 100мс - быстрое применение remote обновлений после паузы в печатании
 		
 		// Убираем placeholder при вводе текста
 		if (target.innerHTML === '<br>' || target.innerHTML === '') {
@@ -718,8 +718,8 @@
 		if (immediate) {
 			doUpdate();
 		} else {
-			// Задержка для батчинга, увеличена для лучшей производительности на продакшене
-			cursorUpdateTimeout = setTimeout(doUpdate, 250);
+			// Задержка для батчинга - 50ms достаточно для группировки быстрых движений
+			cursorUpdateTimeout = setTimeout(doUpdate, 50);
 		}
 	}
 
