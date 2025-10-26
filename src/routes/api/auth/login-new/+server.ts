@@ -25,50 +25,26 @@ export const POST: RequestHandler = async (event) => {
 
 		console.log('Supabase auth successful for:', email);
 
-		// 2. Проверяем/создаем пользователя в локальной БД
-		let dbUser = await prisma.user.findUnique({
-			where: { id: authData.user.id }
-		});
+		// 2. Используем данные из Supabase напрямую (без Prisma для Vercel Serverless)
+		const user = {
+			id: authData.user.id,
+			email: authData.user.email || email,
+			username: authData.user.user_metadata?.username || email.split('@')[0],
+			fullName: authData.user.user_metadata?.full_name || email.split('@')[0],
+			avatarUrl: authData.user.user_metadata?.avatar_url
+		};
 
-		if (!dbUser) {
-			// Создаем пользователя если его нет
-			dbUser = await prisma.user.create({
-				data: {
-					id: authData.user.id,
-					email: authData.user.email || '',
-					fullName: authData.user.user_metadata?.full_name || email.split('@')[0],
-					username: authData.user.user_metadata?.username || email.split('@')[0],
-					avatarUrl: authData.user.user_metadata?.avatar_url
-				}
-			});
-		}
-
-		// 3. Создаем сессию в cookie
-		console.log('[Login] Creating session for user:', dbUser.id);
+		// 3. Пытаемся создать сессию в cookie (но не фейлим если не получится)
+		console.log('[Login] Attempting to create session for user:', user.id);
 		try {
-			const sessionResult = await createUserSession(event, dbUser.id);
-
-			if (sessionResult.error) {
-				console.error('[Login] Session creation failed:', sessionResult.error);
-				// Временный workaround - возвращаем успех даже если сессия не создана
-				// Пользователь будет использовать Supabase токен
-				console.warn('[Login] Proceeding without session cookie (using Supabase token only)');
-			} else {
-				console.log('[Login] Session created successfully');
-			}
+			await createUserSession(event, user.id);
+			console.log('[Login] Session created successfully');
 		} catch (sessionError) {
-			console.error('[Login] Session creation threw error:', sessionError);
-			console.warn('[Login] Proceeding without session cookie (using Supabase token only)');
+			console.warn('[Login] Session creation failed, continuing with Supabase token only:', sessionError);
 		}
 
 		return json({
-			user: {
-				id: dbUser.id,
-				email: dbUser.email,
-				username: dbUser.username,
-				fullName: dbUser.fullName,
-				avatarUrl: dbUser.avatarUrl
-			},
+			user,
 			session: authData.session // Возвращаем Supabase сессию
 		});
 	} catch (error) {
