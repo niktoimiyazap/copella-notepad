@@ -4,7 +4,7 @@
 	import { goto } from '$app/navigation';
 	import { currentUser, authState } from '$lib/stores/user';
 	import { fetchCurrentUser, getAuthToken } from '$lib/api/userApi';
-	import { websocketClient } from '$lib/websocket';
+	import { realtimeClient } from '$lib/realtime';
 
 	// Получаем токен приглашения из параметров маршрута
 	const inviteToken = $derived($page.params.token);
@@ -84,8 +84,8 @@
 
 	onDestroy(() => {
 		// Удаляем обработчик при уничтожении компонента
-		if (websocketClient && wsConnected) {
-			websocketClient.offMessage('approval_response', handleApprovalResponse);
+		if (realtimeClient && wsConnected) {
+			realtimeClient.offMessage('approval_response', handleApprovalResponse);
 		}
 	});
 
@@ -167,21 +167,21 @@
 				// Подключаемся к WebSocket глобально чтобы получить уведомление об одобрении
 				// WebSocket подключится без присоединения к комнате
 				try {
-					console.log('[Invite] Setting up WebSocket connection...');
-					if (websocketClient) {
+					console.log('[Invite] Setting up Realtime connection...');
+					if (realtimeClient) {
 						// Подписываемся на ВСЕ сообщения для отладки
-						websocketClient.onMessage('*', (message) => {
-							console.log('[Invite] Received WebSocket message (all):', message);
+						realtimeClient.onMessage('*', (message) => {
+							console.log('[Invite] Received Realtime message (all):', message);
 						});
 						
 						// Подписываемся на ответ об одобрении ПЕРЕД подключением
 						console.log('[Invite] Subscribing to approval_response events...');
-						websocketClient.onMessage('approval_response', handleApprovalResponse);
+						realtimeClient.onMessage('approval_response', handleApprovalResponse);
 						
-						// Подключаемся к WebSocket
-						console.log('[Invite] Connecting to WebSocket globally...');
-						const connected = await websocketClient.connectGlobal();
-						console.log('[Invite] WebSocket connection result:', connected);
+						// Подключаемся к Realtime
+						console.log('[Invite] Connecting to Realtime globally...');
+						const connected = await realtimeClient.connectGlobal();
+						console.log('[Invite] Realtime connection result:', connected);
 						
 						if (connected) {
 							wsConnected = true;

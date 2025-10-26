@@ -1,6 +1,6 @@
 // Real-time collaborative editing client с использованием Yjs (CRDT)
 import * as Y from 'yjs';
-import { websocketClient } from '../websocket';
+import { realtimeClient } from '../realtime';
 
 export interface CursorInfo {
   userId: string;
@@ -92,8 +92,8 @@ export class DiffSyncManager {
    */
   private async initialize() {
     try {
-      if (!websocketClient) {
-        throw new Error('WebSocket client not available');
+      if (!realtimeClient) {
+        throw new Error('Realtime client not available');
       }
       
       // Подписываемся на сообщения для Yjs синхронизации
@@ -102,11 +102,11 @@ export class DiffSyncManager {
       };
       
       // Подписываемся на сообщения
-      websocketClient.onMessage('yjs_sync', this.messageHandler);
-      websocketClient.onMessage('yjs_update', this.messageHandler);
-      websocketClient.onMessage('cursor_update', this.messageHandler);
-      websocketClient.onMessage('cursor_remove', this.messageHandler);
-      websocketClient.onMessage('note_saved', this.messageHandler);
+      realtimeClient.onMessage('yjs_sync', this.messageHandler);
+      realtimeClient.onMessage('yjs_update', this.messageHandler);
+      realtimeClient.onMessage('cursor_update', this.messageHandler);
+      realtimeClient.onMessage('cursor_remove', this.messageHandler);
+      realtimeClient.onMessage('note_saved', this.messageHandler);
 
       // Запрашиваем начальное состояние документа
       await this.requestSync();
@@ -160,8 +160,8 @@ export class DiffSyncManager {
    * Запрос начальной синхронизации с сервером
    */
   private async requestSync() {
-    if (!websocketClient) {
-      console.error('[YjsSync] WebSocket client not available');
+    if (!realtimeClient) {
+      console.error('[YjsSync] Realtime client not available');
       return;
     }
     
@@ -170,7 +170,7 @@ export class DiffSyncManager {
     // Создаем state vector для запроса отсутствующих updates
     const stateVector = Y.encodeStateVector(this.ydoc);
     
-    websocketClient.send({
+    await realtimeClient.send({
       type: 'yjs_sync_request',
       room_id: this.roomId,
       data: {
@@ -229,14 +229,14 @@ export class DiffSyncManager {
   /**
    * Отправка update на сервер
    */
-  private sendUpdate(update: Uint8Array) {
-    if (!websocketClient || !this.isActive) return;
+  private async sendUpdate(update: Uint8Array) {
+    if (!realtimeClient || !this.isActive) return;
     
     this.isSyncing = true;
     this.onSyncStatus('syncing');
     
     // Конвертируем Uint8Array в обычный массив для JSON
-    websocketClient.send({
+    await realtimeClient.send({
       type: 'yjs_update',
       room_id: this.roomId,
       data: {
@@ -382,12 +382,12 @@ export class DiffSyncManager {
   /**
    * Обновление позиции курсора
    */
-  public updateCursor(position: number, selection?: { start: number; end: number }) {
-    if (!websocketClient || !this.isActive) return;
+  public async updateCursor(position: number, selection?: { start: number; end: number }) {
+    if (!realtimeClient || !this.isActive) return;
     
     // Если position === -1, это значит убрать курсор (blur)
     if (position === -1) {
-      websocketClient.send({
+      await realtimeClient.send({
         type: 'cursor_remove',
         room_id: this.roomId,
         data: {
@@ -397,7 +397,7 @@ export class DiffSyncManager {
       return;
     }
     
-    websocketClient.send({
+    await realtimeClient.send({
       type: 'cursor_update',
       room_id: this.roomId,
       data: {
@@ -472,13 +472,13 @@ export class DiffSyncManager {
   public destroy() {
     this.isActive = false;
     
-    // Отписываемся от WebSocket сообщений
-    if (websocketClient && this.messageHandler) {
-      websocketClient.offMessage('yjs_sync', this.messageHandler);
-      websocketClient.offMessage('yjs_update', this.messageHandler);
-      websocketClient.offMessage('cursor_update', this.messageHandler);
-      websocketClient.offMessage('cursor_remove', this.messageHandler);
-      websocketClient.offMessage('note_saved', this.messageHandler);
+    // Отписываемся от Realtime сообщений
+    if (realtimeClient && this.messageHandler) {
+      realtimeClient.offMessage('yjs_sync', this.messageHandler);
+      realtimeClient.offMessage('yjs_update', this.messageHandler);
+      realtimeClient.offMessage('cursor_update', this.messageHandler);
+      realtimeClient.offMessage('cursor_remove', this.messageHandler);
+      realtimeClient.offMessage('note_saved', this.messageHandler);
     }
     
     // Очищаем Undo Manager
