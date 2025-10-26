@@ -127,17 +127,30 @@ export async function authenticateToken(token: string): Promise<AuthResult> {
  */
 export async function checkRoomAccess(userId: string, roomId: string): Promise<boolean> {
   try {
+    console.log(`[checkRoomAccess] Checking access for userId=${userId}, roomId=${roomId}`);
+    
     // Сначала проверяем, является ли пользователь создателем комнаты
     const room = await prisma.room.findFirst({
       where: {
-        id: roomId,
-        createdBy: userId
+        id: roomId
+      },
+      select: {
+        id: true,
+        createdBy: true,
+        title: true
       }
     });
 
+    if (!room) {
+      console.error(`[checkRoomAccess] Room ${roomId} not found in database`);
+      return false;
+    }
+
+    console.log(`[checkRoomAccess] Room found: ${room.title}, createdBy=${room.createdBy}`);
+
     // Если пользователь - создатель, он всегда имеет доступ
-    if (room) {
-      console.log(`[checkRoomAccess] User ${userId} is the creator of room ${roomId}`);
+    if (room.createdBy === userId) {
+      console.log(`[checkRoomAccess] ✓ User ${userId} is the creator of room ${roomId}`);
       return true;
     }
 
@@ -146,14 +159,33 @@ export async function checkRoomAccess(userId: string, roomId: string): Promise<b
       where: {
         userId,
         roomId
+      },
+      select: {
+        id: true,
+        role: true,
+        canEdit: true,
+        canInvite: true,
+        canDelete: true
       }
     });
 
-    const hasAccess = !!participant;
-    console.log(`[checkRoomAccess] User ${userId} ${hasAccess ? 'has' : 'does not have'} access to room ${roomId} (as participant)`);
-    return hasAccess;
+    if (participant) {
+      console.log(`[checkRoomAccess] ✓ User ${userId} is a participant of room ${roomId} with role=${participant.role}, permissions={canEdit:${participant.canEdit}, canInvite:${participant.canInvite}, canDelete:${participant.canDelete}}`);
+      return true;
+    } else {
+      console.error(`[checkRoomAccess] ✗ User ${userId} is NOT found in RoomParticipant table for room ${roomId}`);
+      
+      // Дополнительная диагностика - проверяем все записи для этой комнаты
+      const allParticipants = await prisma.roomParticipant.findMany({
+        where: { roomId },
+        select: { userId: true, role: true }
+      });
+      console.log(`[checkRoomAccess] All participants in room ${roomId}:`, JSON.stringify(allParticipants));
+      
+      return false;
+    }
   } catch (error) {
-    console.error('[checkRoomAccess] Error:', error);
+    console.error('[checkRoomAccess] Database error:', error);
     return false;
   }
 }
