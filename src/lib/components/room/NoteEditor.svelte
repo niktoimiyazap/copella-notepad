@@ -289,6 +289,17 @@
 			return;
 		}
 		
+		// Защита от дублирования: проверяем разумность изменения
+		const currentLength = currentContent.length;
+		const newLength = newContent.length;
+		const changeRatio = Math.abs(newLength - currentLength) / Math.max(currentLength, 1);
+		
+		// Если изменение > 80% документа и документ не маленький, это подозрительно
+		if (currentLength > 50 && changeRatio > 0.8) {
+			console.warn('[NoteEditor] Suspicious large change detected, possible duplication. Skipping.');
+			return;
+		}
+		
 		// Сохраняем позицию скролла
 		const scrollTop = editorElement.scrollTop;
 		
@@ -314,6 +325,12 @@
 
 	function handleFocus() {
 		isFocused = true;
+		
+		// ВАЖНО: Отправляем текущую позицию курсора при получении фокуса
+		// Это гарантирует что курсор появится после возврата пользователя
+		setTimeout(() => {
+			updateCursorPosition();
+		}, 100);
 	}
 
 	function handleBlur() {
@@ -366,7 +383,7 @@
 			onContentChange(selectedNote.id, content);
 		}
 		
-		// Отправляем в менеджер diff-синхронизации немедленно
+		// Отправляем в менеджер diff-синхронизации (HTML с форматированием)
 		if (diffSyncManager) {
 			diffSyncManager.updateContent(content);
 		}

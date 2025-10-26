@@ -412,6 +412,14 @@ export class DiffSyncManager {
     // Игнорируем если контент не изменился
     if (newContent === currentContent) return;
     
+    // ВАЖНО: Проверяем что изменение не слишком большое
+    // Если изменение > 50% документа, возможно это конфликт - игнорируем
+    const changeSize = Math.abs(newContent.length - currentContent.length);
+    if (currentContent.length > 100 && changeSize > currentContent.length * 0.5) {
+      console.warn('[YjsSync] Large change detected, possible conflict. Skipping to avoid duplication.');
+      return;
+    }
+    
     // Вычисляем умный diff: находим общий префикс и суффикс
     const prefixLen = this.commonPrefixLength(currentContent, newContent);
     const suffixLen = this.commonSuffixLength(currentContent, newContent, prefixLen);
@@ -420,6 +428,11 @@ export class DiffSyncManager {
     const deleteStart = prefixLen;
     const deleteLen = currentContent.length - prefixLen - suffixLen;
     const insertText = newContent.substring(prefixLen, newContent.length - suffixLen);
+    
+    // Не применяем если нет реальных изменений
+    if (deleteLen === 0 && insertText.length === 0) {
+      return;
+    }
     
     // Применяем изменения только к изменённой части
     // transact группирует операции для оптимальной производительности
