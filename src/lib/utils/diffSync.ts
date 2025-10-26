@@ -359,18 +359,50 @@ export class DiffSyncManager {
       return;
     }
     
+    // КРИТИЧНО: Дополнительная валидация Yjs update
+    // Минимальный валидный Yjs update должен быть хотя бы 3 байта
+    if (update.length < 3) {
+      console.warn('[YjsSync] Ignoring too small update (corrupted?):', update.length, 'bytes');
+      return;
+    }
+    
+    // Проверяем что update содержит реальные изменения
+    // Пустой Yjs update обычно имеет длину 2-3 байта и содержит только служебную информацию
+    // Реальные изменения обычно >= 10 байт
+    if (update.length < 5) {
+      console.warn('[YjsSync] Ignoring minimal update (no real changes)');
+      return;
+    }
+    
     this.isSyncing = true;
     this.onSyncStatus('syncing');
     
-    // Конвертируем Uint8Array в обычный массив для JSON
-    websocketClient.send({
-      type: 'yjs_update',
-      room_id: this.roomId,
-      data: {
-        noteId: this.noteId,
-        update: Array.from(update)
+    try {
+      // Конвертируем Uint8Array в обычный массив для JSON
+      const updateArray = Array.from(update);
+      
+      // Финальная проверка перед отправкой
+      if (updateArray.length === 0) {
+        console.warn('[YjsSync] Update array is empty after conversion');
+        this.isSyncing = false;
+        this.onSyncStatus('connected');
+        return;
       }
-    });
+      
+      websocketClient.send({
+        type: 'yjs_update',
+        room_id: this.roomId,
+        data: {
+          noteId: this.noteId,
+          update: updateArray
+        }
+      });
+    } catch (error) {
+      console.error('[YjsSync] Error sending update:', error);
+      this.isSyncing = false;
+      this.onSyncStatus('error');
+      return;
+    }
     
     // Быстро возвращаем статус в connected
     setTimeout(() => {
@@ -421,14 +453,32 @@ export class DiffSyncManager {
     import('y-protocols/awareness').then(({ encodeAwarenessUpdate }) => {
       const awarenessUpdate = encodeAwarenessUpdate(this.awareness, [this.awareness.clientID]);
       
-      websocketClient.send({
-        type: 'awareness_update',
-        room_id: this.roomId,
-        data: {
-          noteId: this.noteId,
-          update: Array.from(awarenessUpdate)
-        }
-      });
+      // Валидация awareness update перед отправкой
+      if (!awarenessUpdate || awarenessUpdate.length === 0) {
+        console.warn('[YjsSync] Empty awareness update, skipping');
+        return;
+      }
+      
+      // Awareness update должен содержать данные (минимум 5 байт)
+      if (awarenessUpdate.length < 5) {
+        console.warn('[YjsSync] Too small awareness update, skipping');
+        return;
+      }
+      
+      try {
+        const updateArray = Array.from(awarenessUpdate);
+        
+        websocketClient.send({
+          type: 'awareness_update',
+          room_id: this.roomId,
+          data: {
+            noteId: this.noteId,
+            update: updateArray
+          }
+        });
+      } catch (error) {
+        console.error('[YjsSync] Error sending awareness update:', error);
+      }
     });
   }
   
