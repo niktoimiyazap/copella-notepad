@@ -151,11 +151,17 @@ export function convertJsonToBinary(jsonMessage: any): Buffer {
   
   // Конвертируем update из массива в Uint8Array (если есть)
   let binaryPayload: Uint8Array | undefined;
+  let metadata = jsonMessage.data;
+  
   if (jsonMessage.data?.update && Array.isArray(jsonMessage.data.update)) {
     binaryPayload = new Uint8Array(jsonMessage.data.update);
+    
+    // Исключаем update из метаданных (он будет в binaryPayload)
+    const { update, ...restData } = jsonMessage.data;
+    metadata = restData;
   }
   
-  return encodeBinaryMessage(type, roomId, jsonMessage.data, binaryPayload);
+  return encodeBinaryMessage(type, roomId, metadata, binaryPayload);
 }
 
 /**

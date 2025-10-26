@@ -496,11 +496,17 @@ class WebSocketClient {
     
     // Конвертируем update из массива в Uint8Array (если есть)
     let binaryPayload: Uint8Array | undefined;
+    let metadata = message.data;
+    
     if (message.data?.update && Array.isArray(message.data.update)) {
       binaryPayload = new Uint8Array(message.data.update);
+      
+      // Исключаем update из метаданных (он будет в binaryPayload)
+      const { update, ...restData } = message.data;
+      metadata = restData;
     }
     
-    return encodeBinaryMessage(type, roomId, message.data, binaryPayload);
+    return encodeBinaryMessage(type, roomId, metadata, binaryPayload);
   }
   
   /**
