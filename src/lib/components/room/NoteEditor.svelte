@@ -11,6 +11,7 @@
 	} from '../../utils/formatting';
 	import { DiffSyncManager, type CursorInfo } from '../../utils/diffSync';
 	import { useWebSocket } from '../../websocket';
+	import { applyIncrementalUpdate } from '../../utils/domDiff';
 	
 	type SyncStatus = 'connected' | 'syncing' | 'saved' | 'error';
 
@@ -265,8 +266,13 @@
 				return;
 			}
 			
-			editorElement.innerHTML = newContent;
-			content = newContent;
+			// КЛЮЧЕВОЕ ИЗМЕНЕНИЕ: Инкрементальное обновление DOM вместо полной перезаписи
+			// Это патчит только изменённые узлы, сохраняя курсор автоматически
+			const hasChanges = applyIncrementalUpdate(editorElement, newContent, isFocused);
+			
+			if (hasChanges) {
+				content = newContent;
+			}
 			
 			// Восстанавливаем скролл
 			editorElement.scrollTop = scrollTop;

@@ -266,8 +266,9 @@
 		top: 0;
 		left: 0;
 		pointer-events: none;
-		/* Убран transition для лучшей производительности */
 		will-change: transform;
+		/* Плавное движение курсора как в Figma - интерполяция позиции */
+		transition: transform 150ms cubic-bezier(0.4, 0.0, 0.2, 1);
 	}
 
 	.cursor-line {
@@ -322,8 +323,9 @@
 		background-color: var(--cursor-color);
 		opacity: 0.2;
 		pointer-events: none;
-		/* Убран transition для лучшей производительности */
 		will-change: transform, width, height;
+		/* Плавное изменение выделения */
+		transition: transform 100ms ease-out, width 100ms ease-out, height 100ms ease-out, opacity 200ms ease-out;
 	}
 </style>
 
