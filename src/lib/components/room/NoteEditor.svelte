@@ -85,6 +85,11 @@
 	// Флаг для отслеживания активного ввода текста
 	let isTyping = false;
 	let typingTimeout: ReturnType<typeof setTimeout> | null = null;
+	
+	// Throttle для обновлений DOM от сервера
+	let pendingRemoteUpdate: string | null = null;
+	let remoteUpdateTimeout: ReturnType<typeof setTimeout> | null = null;
+	let lastRemoteUpdateTime = 0;
 
 	// Реактивно обновляем содержимое редактора при изменении выбранной заметки
 	$effect(() => {
@@ -132,52 +137,30 @@
 					// КРИТИЧНО: Если пользователь активно печатает, откладываем обновление
 					// чтобы не сбрасывать курсор во время ввода
 					if (isTyping) {
-						// Отложим обновление на короткое время после завершения печати
+						// Сохраняем pending обновление для применения позже
+						pendingRemoteUpdate = newContent;
 						return;
 					}
 					
-					// Если пользователь печатает (редактор в фокусе) - сохраняем позицию курсора
-					let savedCursorPosition: number | null = null;
-					if (isFocused && document.activeElement === editorElement) {
-						const selection = window.getSelection();
-						if (selection && selection.rangeCount > 0) {
-							try {
-								const range = selection.getRangeAt(0);
-								const preRange = document.createRange();
-								preRange.selectNodeContents(editorElement);
-								preRange.setEnd(range.endContainer, range.endOffset);
-								savedCursorPosition = preRange.toString().length;
-							} catch (error) {
-								// Игнорируем ошибки
-							}
+					// Throttle: не обновляем DOM чаще чем раз в 100ms
+					const now = Date.now();
+					const timeSinceLastUpdate = now - lastRemoteUpdateTime;
+					
+					if (timeSinceLastUpdate < 100 && !isFocused) {
+						// Сохраняем pending обновление
+						pendingRemoteUpdate = newContent;
+						
+						// Если таймер не установлен, устанавливаем
+						if (!remoteUpdateTimeout) {
+							remoteUpdateTimeout = setTimeout(() => {
+								applyRemoteUpdate();
+							}, 100 - timeSinceLastUpdate);
 						}
+						return;
 					}
 					
-					// Сохраняем позицию скролла
-					const scrollTop = editorElement.scrollTop;
-					
-					// Применяем обновление используя requestAnimationFrame для плавности
-					requestAnimationFrame(() => {
-						if (!editorElement) return;
-						
-						editorElement.innerHTML = newContent;
-						content = newContent;
-						
-						// Восстанавливаем скролл
-						editorElement.scrollTop = scrollTop;
-						
-						// Восстанавливаем курсор если был сохранен
-						if (savedCursorPosition !== null) {
-							// Используем микрозадачу для гарантии что DOM обновился
-							queueMicrotask(() => {
-								try {
-									restoreCursorPosition(editorElement!, savedCursorPosition);
-								} catch (error) {
-									// Игнорируем ошибки восстановления курсора
-								}
-							});
-						}
-					});
+					// Применяем обновление немедленно
+					applyRemoteContentUpdate(newContent);
 				},
 				onCursorsUpdate: (cursors) => {
 					remoteCursors = cursors;
@@ -227,6 +210,9 @@
 		if (typingTimeout) {
 			clearTimeout(typingTimeout);
 		}
+		if (remoteUpdateTimeout) {
+			clearTimeout(remoteUpdateTimeout);
+		}
 
 		// Очищаем менеджер синхронизации
 		if (diffSyncManager) {
@@ -234,6 +220,66 @@
 			diffSyncManager = null;
 		}
 	});
+
+	// Функция для применения отложенного обновления от сервера
+	function applyRemoteUpdate() {
+		if (pendingRemoteUpdate && editorElement) {
+			applyRemoteContentUpdate(pendingRemoteUpdate);
+			pendingRemoteUpdate = null;
+		}
+		remoteUpdateTimeout = null;
+	}
+	
+	// Функция для применения обновления контента от сервера
+	function applyRemoteContentUpdate(newContent: string) {
+		if (!editorElement) return;
+		
+		// Обновляем время последнего обновления
+		lastRemoteUpdateTime = Date.now();
+		
+		// Если пользователь печатает (редактор в фокусе) - сохраняем позицию курсора
+		let savedCursorPosition: number | null = null;
+		if (isFocused && document.activeElement === editorElement) {
+			const selection = window.getSelection();
+			if (selection && selection.rangeCount > 0) {
+				try {
+					const range = selection.getRangeAt(0);
+					const preRange = document.createRange();
+					preRange.selectNodeContents(editorElement);
+					preRange.setEnd(range.endContainer, range.endOffset);
+					savedCursorPosition = preRange.toString().length;
+				} catch (error) {
+					// Игнорируем ошибки
+				}
+			}
+		}
+		
+		// Сохраняем позицию скролла
+		const scrollTop = editorElement.scrollTop;
+		
+		// Применяем обновление используя requestAnimationFrame для плавности
+		requestAnimationFrame(() => {
+			if (!editorElement) return;
+			
+			editorElement.innerHTML = newContent;
+			content = newContent;
+			
+			// Восстанавливаем скролл
+			editorElement.scrollTop = scrollTop;
+			
+			// Восстанавливаем курсор если был сохранен
+			if (savedCursorPosition !== null) {
+				// Используем микрозадачу для гарантии что DOM обновился
+				queueMicrotask(() => {
+					try {
+						restoreCursorPosition(editorElement!, savedCursorPosition);
+					} catch (error) {
+						// Игнорируем ошибки восстановления курсора
+					}
+				});
+			}
+		});
+	}
 
 	function handleFocus() {
 		isFocused = true;
@@ -263,6 +309,11 @@
 		// Сбрасываем флаг isTyping через короткую паузу после последнего символа
 		typingTimeout = setTimeout(() => {
 			isTyping = false;
+			
+			// Применяем отложенное обновление если есть
+			if (pendingRemoteUpdate) {
+				applyRemoteUpdate();
+			}
 		}, 300); // 300мс паузы после печати считается окончанием ввода
 		
 		// Убираем placeholder при вводе текста
@@ -615,8 +666,8 @@
 		if (immediate) {
 			doUpdate();
 		} else {
-			// Минимальная задержка для батчинга, но не слишком большая чтобы не лагало
-			cursorUpdateTimeout = setTimeout(doUpdate, 150);
+			// Задержка для батчинга, увеличена для лучшей производительности на продакшене
+			cursorUpdateTimeout = setTimeout(doUpdate, 250);
 		}
 	}
 
