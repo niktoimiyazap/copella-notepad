@@ -251,37 +251,47 @@ export const PATCH: RequestHandler = async ({ params, request, cookies }) => {
 		return json({ error: 'Unauthorized' }, { status: 401 });
 	}
 
-		// Парсим тело запроса
-		const body = await request.json();
-		const { userId, permissions } = body;
+	// Парсим тело запроса
+	const body = await request.json();
+	const { userId, permissions } = body;
 
-		if (!userId || !permissions) {
-			return json({ error: 'Missing userId or permissions' }, { status: 400 });
+	if (!userId || !permissions) {
+		return json({ error: 'Missing userId or permissions' }, { status: 400 });
+	}
+
+	// БЕЗОПАСНОСТЬ: Нельзя изменить свои собственные права
+	if (userId === user.id) {
+		return json({ error: 'Cannot change your own permissions' }, { status: 403 });
+	}
+
+	// Проверяем, что текущий пользователь имеет права на управление участниками
+	const currentParticipant = await prisma.roomParticipant.findFirst({
+		where: {
+			roomId,
+			userId: user.id
 		}
+	});
 
-		// Проверяем, что текущий пользователь имеет права на управление участниками
-		const currentParticipant = await prisma.roomParticipant.findFirst({
-			where: {
-				roomId,
-				userId: user.id
-			}
-		});
+	if (!currentParticipant || !['creator', 'owner', 'admin'].includes(currentParticipant.role)) {
+		return json({ error: 'Insufficient permissions' }, { status: 403 });
+	}
 
-		if (!currentParticipant || !['creator', 'owner', 'admin'].includes(currentParticipant.role)) {
-			return json({ error: 'Insufficient permissions' }, { status: 403 });
+	// Проверяем, что целевой участник существует в комнате
+	const targetParticipant = await prisma.roomParticipant.findFirst({
+		where: {
+			roomId,
+			userId
 		}
+	});
 
-		// Проверяем, что целевой участник существует в комнате
-		const targetParticipant = await prisma.roomParticipant.findFirst({
-			where: {
-				roomId,
-				userId
-			}
-		});
+	if (!targetParticipant) {
+		return json({ error: 'User is not a participant of this room' }, { status: 404 });
+	}
 
-		if (!targetParticipant) {
-			return json({ error: 'User is not a participant of this room' }, { status: 404 });
-		}
+	// БЕЗОПАСНОСТЬ: Запрещаем изменять права creator, owner и admin
+	if (['creator', 'owner', 'admin'].includes(targetParticipant.role)) {
+		return json({ error: 'Cannot change permissions for creator, owner or admin' }, { status: 403 });
+	}
 
 		// Не меняем роль при обновлении прав - роль задаётся отдельно
 		// Сохраняем текущую роль участника
@@ -366,22 +376,27 @@ export const DELETE: RequestHandler = async ({ params, request, cookies }) => {
 			return json({ error: 'Insufficient permissions' }, { status: 403 });
 		}
 
-		// Нельзя удалить владельца комнаты
-		if (userId === room.createdBy) {
-			return json({ error: 'Cannot remove room owner' }, { status: 400 });
-		}
+	// Нельзя удалить владельца комнаты
+	if (userId === room.createdBy) {
+		return json({ error: 'Cannot remove room owner' }, { status: 400 });
+	}
 
-		// Проверяем, что целевой участник существует в комнате
-		const targetParticipant = await prisma.roomParticipant.findFirst({
-			where: {
-				roomId,
-				userId
-			}
-		});
-
-		if (!targetParticipant) {
-			return json({ error: 'User is not a participant of this room' }, { status: 404 });
+	// Проверяем, что целевой участник существует в комнате
+	const targetParticipant = await prisma.roomParticipant.findFirst({
+		where: {
+			roomId,
+			userId
 		}
+	});
+
+	if (!targetParticipant) {
+		return json({ error: 'User is not a participant of this room' }, { status: 404 });
+	}
+
+	// БЕЗОПАСНОСТЬ: Запрещаем удалять участника с ролью creator
+	if (targetParticipant.role === 'creator') {
+		return json({ error: 'Cannot remove room creator' }, { status: 403 });
+	}
 
 	// Удаляем участника и все его ожидающие приглашения/заявки в транзакции
 	await prisma.$transaction(async (tx) => {
