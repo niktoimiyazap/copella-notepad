@@ -246,6 +246,9 @@ class WebSocketClient {
       const wsBaseUrl = env.PUBLIC_WS_URL || 'ws://localhost:3001';
       const wsUrl = `${wsBaseUrl}?token=${token}`;
       this.ws = new WebSocket(wsUrl);
+      
+      // Устанавливаем тип данных для оптимизированного протокола
+      this.ws.binaryType = 'arraybuffer';
 
       return new Promise((resolve, reject) => {
         if (!this.ws) {
@@ -325,7 +328,18 @@ class WebSocketClient {
 
         this.ws.onmessage = (event) => {
           try {
-            const message: WebSocketMessage = JSON.parse(event.data);
+            // Поддерживаем как бинарный, так и JSON протоколы
+            let message: WebSocketMessage;
+            
+            if (isBinaryMessage(event.data)) {
+              // Бинарный протокол (оптимизированный)
+              const binaryMsg = decodeBinaryMessage(event.data);
+              message = this.convertBinaryToJson(binaryMsg);
+            } else {
+              // Старый JSON протокол (fallback)
+              message = JSON.parse(event.data);
+            }
+            
             this.handleMessage(message);
           } catch (error) {
             console.error('[WebSocket] Error parsing message:', error);
