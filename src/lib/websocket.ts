@@ -6,20 +6,21 @@ import { env } from '$env/dynamic/public';
 // Функция для получения токена авторизации
 async function getAuthToken(): Promise<string | null> {
 	try {
-		// Сначала пытаемся получить токен из localStorage (приоритет)
-		if (browser && typeof window !== 'undefined') {
-			const token = window.localStorage.getItem('session_token');
-			if (token) {
-				return token;
-			}
+		// ВСЕГДА берем свежий токен через Supabase
+		// Supabase автоматически обновляет токен если он истек
+		const { data: { session }, error } = await supabase.auth.getSession();
+		
+		if (error) {
+			console.error('[getAuthToken] Error getting session:', error);
+			return null;
 		}
 		
-		// Fallback: пытаемся получить через Supabase
-		const { data: { session } } = await supabase.auth.getSession();
 		if (session?.access_token) {
+			console.log('[getAuthToken] Got fresh token from Supabase');
 			return session.access_token;
 		}
 		
+		console.warn('[getAuthToken] No active session found');
 		return null;
 	} catch (error) {
 		console.error('[getAuthToken] Error:', error);
@@ -63,7 +64,31 @@ class WebSocketClient {
       window.addEventListener('beforeunload', () => {
         this.forceDisconnect();
       });
+      
+      // Слушаем обновление токена Supabase и переподключаемся
+      supabase.auth.onAuthStateChange((event, session) => {
+        if (event === 'TOKEN_REFRESHED' && this.currentRoomId && this.isConnected()) {
+          console.log('[WebSocket] Token refreshed, reconnecting...');
+          this.reconnectWithNewToken();
+        } else if (event === 'SIGNED_OUT') {
+          console.log('[WebSocket] User signed out, disconnecting...');
+          this.forceDisconnect();
+        }
+      });
     }
+  }
+  
+  private async reconnectWithNewToken() {
+    const roomId = this.currentRoomId;
+    if (!roomId) return;
+    
+    // Отключаемся от текущего соединения
+    this.forceDisconnect();
+    
+    // Подключаемся заново с новым токеном
+    setTimeout(() => {
+      this.connect(roomId);
+    }, 500);
   }
 
   async connectGlobal(): Promise<boolean> {
@@ -199,8 +224,23 @@ class WebSocketClient {
           if (message.type === 'error') {
             console.error('[WebSocket] Server error:', message.data?.error);
             
+            const errorMsg = message.data?.error || '';
+            
+            // Если токен истек - пробуем переподключиться с новым токеном
+            if (errorMsg.includes('Invalid or expired token') || errorMsg.includes('expired')) {
+              console.log('[WebSocket] Token expired, attempting reconnect with new token...');
+              this.offMessage('error', handleError);
+              this.offMessage('room_joined', handleRoomJoined);
+              
+              // Переподключаемся с новым токеном через короткую задержку
+              setTimeout(() => {
+                this.reconnectWithNewToken();
+              }, 1000);
+              return;
+            }
+            
             // Если ошибка связана с доступом к комнате, не переподключаемся
-            if (message.data?.error?.includes('Access denied')) {
+            if (errorMsg.includes('Access denied')) {
               this.offMessage('error', handleError);
               this.offMessage('room_joined', handleRoomJoined);
               reject(new Error(message.data.error));
