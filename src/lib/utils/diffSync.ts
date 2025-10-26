@@ -386,6 +386,7 @@ export class DiffSyncManager {
     const insertText = newContent.substring(prefixLen, newContent.length - suffixLen);
     
     // Применяем изменения только к изменённой части
+    // transact группирует операции для оптимальной производительности
     this.ydoc.transact(() => {
       // Сначала удаляем (если нужно)
       if (deleteLen > 0) {

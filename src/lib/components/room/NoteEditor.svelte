@@ -220,9 +220,6 @@
 			content = target.innerHTML;
 		}
 		
-		// Обновляем форматы
-		updateActiveFormats();
-		
 		// Обновляем локальное состояние
 		if (selectedNote && onContentChange) {
 			onContentChange(selectedNote.id, content);
@@ -233,11 +230,8 @@
 			diffSyncManager.updateContent(content);
 		}
 		
-		// Обновляем состояние Undo/Redo
-		updateUndoRedoState();
-		
-		// Отправляем позицию курсора
-		updateCursorPosition();
+		// НЕ обновляем форматы и undo/redo на каждое нажатие - это замедляет ввод
+		// Они обновятся в handleKeyUp и handleMouseUp
 	}
 
 	function handleKeyDown(event: KeyboardEvent) {
@@ -569,8 +563,8 @@
 		if (immediate) {
 			doUpdate();
 		} else {
-			// Отправляем с небольшой задержкой для батчинга
-			cursorUpdateTimeout = setTimeout(doUpdate, 100);
+			// Увеличена задержка с 100ms до 300ms для снижения нагрузки и лагов
+			cursorUpdateTimeout = setTimeout(doUpdate, 300);
 		}
 	}
 

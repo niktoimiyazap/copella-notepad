@@ -266,7 +266,7 @@
 		top: 0;
 		left: 0;
 		pointer-events: none;
-		transition: transform 0.15s ease-out;
+		/* Убран transition для лучшей производительности */
 		will-change: transform;
 	}
 
@@ -322,7 +322,7 @@
 		background-color: var(--cursor-color);
 		opacity: 0.2;
 		pointer-events: none;
-		transition: all 0.15s ease-out;
+		/* Убран transition для лучшей производительности */
 		will-change: transform, width, height;
 	}
 </style>
