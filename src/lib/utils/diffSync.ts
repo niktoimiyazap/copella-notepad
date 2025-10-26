@@ -2,6 +2,7 @@
 import * as Y from 'yjs';
 import { Awareness } from 'y-protocols/awareness';
 import { IndexeddbPersistence } from 'y-indexeddb';
+import { WebrtcProvider } from 'y-webrtc';
 import { websocketClient } from '../websocket';
 import { WebSocketBatcher } from './websocketBatcher';
 
@@ -44,6 +45,7 @@ export class DiffSyncManager {
   private undoManager: Y.UndoManager;
   private awareness: Awareness;
   private indexeddbProvider: IndexeddbPersistence | null = null;
+  private webrtcProvider: WebrtcProvider | null = null;
   private isActive = true;
   private isSyncing = false;
   private isInitialized = false;
@@ -56,8 +58,12 @@ export class DiffSyncManager {
   // Курсоры других пользователей
   private remoteCursors = new Map<string, CursorInfo>();
   
-  // WebSocket
+  // WebSocket (используется для fallback и сохранения в БД)
   private messageHandler: ((message: any) => void) | null = null;
+  
+  // Отслеживание типа соединения для оптимизации
+  private connectionType: 'webrtc' | 'websocket' = 'websocket';
+  private webrtcConnected = false;
 
   // Батчинг для обновлений контента (адаптивный для мобильных)
   private pendingContentUpdate: string | null = null;
@@ -137,6 +143,70 @@ export class DiffSyncManager {
     // Инициализируем IndexedDB для offline-first и мгновенной загрузки
     if (typeof window !== 'undefined') {
       this.indexeddbProvider = new IndexeddbPersistence(`copella-note-${this.noteId}`, this.ydoc);
+    }
+
+    // Инициализируем WebRTC для P2P синхронизации
+    // WebRTC дает латентность 20-50ms (в 5-10 раз быстрее чем WebSocket через сервер)
+    if (typeof window !== 'undefined') {
+      try {
+        this.webrtcProvider = new WebrtcProvider(
+          `copella-room-${this.roomId}-note-${this.noteId}`, // Уникальная комната для каждой заметки
+          this.ydoc,
+          {
+            awareness: this.awareness,
+            // Signaling серверы для установки P2P соединения
+            signaling: [
+              'wss://signaling.yjs.dev', // Публичный signaling от Yjs
+              'wss://y-webrtc-signaling-eu.herokuapp.com',
+              'wss://y-webrtc-signaling-us.herokuapp.com'
+            ],
+            // STUN/TURN серверы для NAT traversal
+            peerOpts: {
+              config: {
+                iceServers: [
+                  // Google публичные STUN серверы
+                  { urls: 'stun:stun.l.google.com:19302' },
+                  { urls: 'stun:stun1.l.google.com:19302' },
+                  { urls: 'stun:stun2.l.google.com:19302' },
+                  { urls: 'stun:stun3.l.google.com:19302' },
+                  { urls: 'stun:stun4.l.google.com:19302' }
+                ]
+              }
+            },
+            // Максимум пиров для P2P (оптимизация для производительности)
+            maxConns: 20
+          }
+        );
+
+        // Отслеживание состояния WebRTC подключения
+        this.webrtcProvider.on('synced', () => {
+          console.log('[WebRTC] ✅ Synced with peers');
+          this.webrtcConnected = true;
+          this.connectionType = 'webrtc';
+          this.onSyncStatus('connected');
+        });
+
+        this.webrtcProvider.on('peers', (event: { added: string[], removed: string[], webrtcPeers: string[] }) => {
+          console.log(`[WebRTC] Peers changed: ${event.webrtcPeers.length} active`);
+          
+          // Если есть хотя бы один peer через WebRTC, используем его
+          if (event.webrtcPeers.length > 0) {
+            this.webrtcConnected = true;
+            this.connectionType = 'webrtc';
+          } else {
+            // Нет P2P соединений - fallback на WebSocket
+            this.webrtcConnected = false;
+            this.connectionType = 'websocket';
+            console.log('[WebRTC] ⚠️ No P2P peers, falling back to WebSocket');
+          }
+        });
+
+        console.log('[WebRTC] 🚀 P2P provider initialized');
+      } catch (error) {
+        console.error('[WebRTC] ❌ Failed to initialize, using WebSocket fallback:', error);
+        this.webrtcProvider = null;
+        this.connectionType = 'websocket';
+      }
     }
 
     // Создаем Undo Manager с умными настройками
@@ -1079,6 +1149,13 @@ export class DiffSyncManager {
     if (this.indexeddbProvider) {
       this.indexeddbProvider.destroy();
       this.indexeddbProvider = null;
+    }
+    
+    // Закрываем WebRTC провайдер
+    if (this.webrtcProvider) {
+      this.webrtcProvider.destroy();
+      this.webrtcProvider = null;
+      console.log('[WebRTC] 🔌 Provider closed');
     }
     
     // Отписываемся от WebSocket сообщений
