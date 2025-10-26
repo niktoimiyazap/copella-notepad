@@ -40,11 +40,15 @@ export async function authenticateToken(token: string): Promise<AuthResult> {
     // Если пользователя нет в локальной БД - создаем его автоматически
     if (!dbUser) {
       console.log('[authenticateToken] User not found in database, creating:', user.id);
+      console.log('[authenticateToken] User email:', user.email);
+      console.log('[authenticateToken] User metadata:', JSON.stringify(user.user_metadata));
       try {
         // Генерируем уникальный username на основе email или user id
         const baseUsername = user.email?.split('@')[0] || `user_${user.id.slice(0, 8)}`;
         let username = baseUsername;
         let attempt = 0;
+        
+        console.log('[authenticateToken] Attempting to create user with username:', username);
         
         // Пытаемся найти свободный username
         while (attempt < 10) {
@@ -59,16 +63,21 @@ export async function authenticateToken(token: string): Promise<AuthResult> {
           // Добавляем суффикс к username
           attempt++;
           username = `${baseUsername}_${attempt}`;
+          console.log('[authenticateToken] Username taken, trying:', username);
         }
         
+        const userData = {
+          id: user.id,
+          email: user.email || '',
+          fullName: user.user_metadata?.full_name || user.email?.split('@')[0] || 'User',
+          username,
+          avatarUrl: user.user_metadata?.avatar_url
+        };
+        
+        console.log('[authenticateToken] Creating user with data:', JSON.stringify(userData));
+        
         dbUser = await prisma.user.create({
-          data: {
-            id: user.id,
-            email: user.email || '',
-            fullName: user.user_metadata?.full_name || user.email?.split('@')[0] || 'User',
-            username,
-            avatarUrl: user.user_metadata?.avatar_url
-          },
+          data: userData,
           select: {
             id: true,
             email: true,
@@ -78,11 +87,17 @@ export async function authenticateToken(token: string): Promise<AuthResult> {
           }
         });
         console.log('[authenticateToken] User created successfully:', dbUser.id);
-      } catch (createError) {
+      } catch (createError: any) {
         console.error('[authenticateToken] Error creating user:', createError);
+        console.error('[authenticateToken] Error details:', {
+          message: createError.message,
+          code: createError.code,
+          meta: createError.meta,
+          stack: createError.stack
+        });
         return {
           isValid: false,
-          error: 'Failed to create user in database'
+          error: `Failed to create user in database: ${createError.message}`
         };
       }
     }
