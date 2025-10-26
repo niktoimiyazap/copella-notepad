@@ -265,7 +265,7 @@ export class DiffSyncHandler {
   }
 
   /**
-   * Трансляция update другим клиентам (с батчингом)
+   * Трансляция update другим клиентам (БЕЗ батчинга для минимальной задержки)
    */
   private broadcastUpdate(
     roomId: string,
@@ -273,8 +273,9 @@ export class DiffSyncHandler {
     update: number[],
     excludeUserId: string
   ): void {
-    // Yjs updates имеют высокий приоритет
-    this.batcher.enqueue(
+    // Yjs updates отправляем НЕМЕДЛЕННО без батчинга для минимальной задержки
+    // Это критично для real-time печати - каждая буква должна приходить мгновенно
+    this.connectionHandler.broadcastToRoom(
       roomId,
       {
         type: 'yjs_update',
@@ -285,8 +286,7 @@ export class DiffSyncHandler {
         },
         timestamp: new Date()
       },
-      excludeUserId,
-      'high' // Высокий приоритет для content updates
+      excludeUserId
     );
   }
 

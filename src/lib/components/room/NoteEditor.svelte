@@ -78,19 +78,6 @@
 
 	// Менеджер синхронизации
 	let diffSyncManager: DiffSyncManager | null = null;
-	
-	// Throttle для предотвращения слишком частых обновлений при быстрой печати
-	let lastInputTime = 0;
-	let inputThrottleDelay = 16; // ~60 FPS, достаточно для плавности
-
-	// Флаг для отслеживания активного ввода текста
-	let isTyping = false;
-	let typingTimeout: ReturnType<typeof setTimeout> | null = null;
-	
-	// Throttle для обновлений DOM от сервера
-	let pendingRemoteUpdate: string | null = null;
-	let remoteUpdateTimeout: ReturnType<typeof setTimeout> | null = null;
-	let lastRemoteUpdateTime = 0;
 
 	// Реактивно обновляем содержимое редактора при изменении выбранной заметки
 	$effect(() => {
@@ -139,15 +126,9 @@
 						return;
 					}
 					
-					// КРИТИЧНО: Если пользователь активно печатает, откладываем обновление
-					// чтобы не сбрасывать курсор во время ввода
-					if (isTyping) {
-						// Сохраняем pending обновление для применения позже
-						pendingRemoteUpdate = newContent;
-						return;
-					}
-					
-					// Применяем обновление немедленно без throttle для real-time sync
+					// Применяем обновление ВСЕГДА мгновенно
+					// Yjs CRDT автоматически разрешит конфликты, даже если пользователь печатает
+					// morphDOM сохранит позицию курсора
 					applyRemoteContentUpdate(newContent);
 				},
 				onCursorsUpdate: (cursors) => {
@@ -213,12 +194,6 @@
 		if (mouseMoveThrottleTimeout) {
 			clearTimeout(mouseMoveThrottleTimeout);
 		}
-		if (typingTimeout) {
-			clearTimeout(typingTimeout);
-		}
-		if (remoteUpdateTimeout) {
-			clearTimeout(remoteUpdateTimeout);
-		}
 
 		// Очищаем менеджер синхронизации
 		if (diffSyncManager) {
@@ -229,21 +204,9 @@
 		// НЕ очищаем курсоры - они будут сохранены для следующего открытия заметки
 	});
 
-	// Функция для применения отложенного обновления от сервера
-	function applyRemoteUpdate() {
-		if (pendingRemoteUpdate && editorElement) {
-			applyRemoteContentUpdate(pendingRemoteUpdate);
-			pendingRemoteUpdate = null;
-		}
-		remoteUpdateTimeout = null;
-	}
-	
 	// Функция для применения обновления контента от сервера
 	function applyRemoteContentUpdate(newContent: string) {
 		if (!editorElement) return;
-		
-		// Обновляем время последнего обновления
-		lastRemoteUpdateTime = Date.now();
 		
 		const currentContent = editorElement.innerHTML;
 		
@@ -252,37 +215,24 @@
 			return;
 		}
 		
-		// КРИТИЧНО: НЕ блокируем обновления, если пользователь печатает!
-		// Только откладываем на короткое время если идет активный ввод (isTyping)
-		if (isTyping) {
-			// Сохраняем pending только если идет активная печать прямо сейчас
-			pendingRemoteUpdate = newContent;
-			return;
-		}
-		
-		// Убрана проверка на "большое изменение" - Yjs сам управляет конфликтами
-		
 		// Сохраняем позицию скролла
 		const scrollTop = editorElement.scrollTop;
 		
-		// Применяем обновление используя requestAnimationFrame для плавности
-		requestAnimationFrame(() => {
-			if (!editorElement) return;
+		// Применяем обновление НЕМЕДЛЕННО
+		// morphDOM + Yjs CRDT гарантируют корректное разрешение конфликтов и сохранение курсора
+		// КЛЮЧЕВОЕ ИЗМЕНЕНИЕ: Инкрементальное обновление DOM с сохранением курсора
+		// morphDOM автоматически сохраняет курсор, даже если пользователь в фокусе
+		const hasChanges = applyIncrementalUpdate(editorElement, newContent, true);
+		
+		if (hasChanges) {
+			content = newContent;
 			
-			// КЛЮЧЕВОЕ ИЗМЕНЕНИЕ: Инкрементальное обновление DOM с сохранением курсора
-			// morphDOM автоматически сохраняет курсор, даже если пользователь в фокусе
-			const hasChanges = applyIncrementalUpdate(editorElement, newContent, true);
-			
-			if (hasChanges) {
-				content = newContent;
-				
-				// ВАЖНО: Триггерим событие для обновления курсоров других пользователей
-				editorElement.dispatchEvent(new CustomEvent('content-updated'));
-			}
-			
-			// Восстанавливаем скролл
-			editorElement.scrollTop = scrollTop;
-		});
+			// ВАЖНО: Триггерим событие для обновления курсоров других пользователей
+			editorElement.dispatchEvent(new CustomEvent('content-updated'));
+		}
+		
+		// Восстанавливаем скролл
+		editorElement.scrollTop = scrollTop;
 	}
 
 	function handleFocus() {
@@ -297,39 +247,14 @@
 
 	function handleBlur() {
 		isFocused = false;
-		isTyping = false;
 		
 		// НЕ удаляем курсор при потере фокуса
 		// Это позволяет другим пользователям видеть где был курсор
 		// Курсор автоматически исчезнет через 30 секунд если не будет обновлений
-		
-		// Применяем все отложенные обновления когда пользователь убирает фокус
-		if (pendingRemoteUpdate) {
-			// Применяем сразу, не ждем
-			applyRemoteUpdate();
-		}
 	}
 
 	function handleInput(event: Event) {
 		const target = event.target as HTMLDivElement;
-		
-		// Устанавливаем флаг активного ввода
-		isTyping = true;
-		
-		// Сбрасываем предыдущий таймер
-		if (typingTimeout) {
-			clearTimeout(typingTimeout);
-		}
-		
-		// Сбрасываем флаг isTyping почти мгновенно для instant remote updates
-		typingTimeout = setTimeout(() => {
-			isTyping = false;
-			
-			// Применяем отложенное обновление если есть
-			if (pendingRemoteUpdate) {
-				applyRemoteUpdate();
-			}
-		}, 30); // 30мс - мгновенное применение remote обновлений
 		
 		// Убираем placeholder при вводе текста
 		if (target.innerHTML === '<br>' || target.innerHTML === '') {
