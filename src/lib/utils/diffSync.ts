@@ -83,7 +83,7 @@ export class DiffSyncManager {
   
   // Throttling для awareness updates
   private lastAwarenessUpdate: number = 0;
-  private awarenessThrottle: number = 50; // 50ms между обновлениями (оптимально для курсоров, как в Figma)
+  private awarenessThrottle: number; // Адаптивный throttle: 30ms для мобильных, 50ms для десктопа
   private pendingAwarenessUpdate: ReturnType<typeof setTimeout> | null = null;
 
   // Мониторинг качества соединения
@@ -110,10 +110,11 @@ export class DiffSyncManager {
     this.onCursorsUpdate = options.onCursorsUpdate;
     this.onSyncStatus = options.onSyncStatus;
 
-    // Адаптивный throttle для курсора
-    // На мобильных: 100ms = 10 обновлений в секунду (достаточно для отображения курсора)
-    // На десктопе: 50ms = 20 обновлений в секунду (оптимально для real-time курсоров, как в Figma)
-    this.cursorThrottle = this.isMobile ? 100 : 50;
+    // Адаптивный throttle для курсора и awareness
+    // На мобильных: 50ms для курсора, 30ms для awareness (оптимально для 4G, как в инструкции)
+    // На десктопе: 50ms для обоих (оптимально для real-time, как в Figma)
+    this.cursorThrottle = this.isMobile ? 50 : 50; // Снижено с 100ms до 50ms для мобильных
+    this.awarenessThrottle = this.isMobile ? 30 : 50; // 30ms для мобильных для быстрой синхронизации
 
     // Создаем батчер для cursor updates (только для мобильных)
     if (this.isMobile) {

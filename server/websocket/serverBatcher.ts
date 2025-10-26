@@ -20,7 +20,7 @@ export class ServerBatcher {
   
   // Настройки батчинга
   private config = {
-    maxWaitTime: 16, // 16ms = ~60fps
+    maxWaitTime: 50, // 50ms оптимально для мобильных устройств (как в Figma)
     maxBatchSize: 50, // Максимум 50 обновлений в одном батче
   };
 
