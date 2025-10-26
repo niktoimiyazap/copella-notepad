@@ -160,6 +160,10 @@ export class DiffSyncManager {
         // Применяем только удаленные изменения
         const content = this.ytext.toString();
         this.onContentUpdate(content);
+        
+        // КЛЮЧЕВОЕ ИСПРАВЛЕНИЕ: Обновляем курсоры после изменения документа
+        // Это пересчитает абсолютные позиции из относительных
+        this.handleAwarenessChange();
       }
     });
 
@@ -657,6 +661,7 @@ export class DiffSyncManager {
 
   /**
    * Обработка изменений Awareness (курсоры других пользователей)
+   * КОНВЕРТИРУЕТ ОТНОСИТЕЛЬНЫЕ ПОЗИЦИИ в абсолютные для отрисовки
    */
   private handleAwarenessChange() {
     const states = this.awareness.getStates();
@@ -673,15 +678,67 @@ export class DiffSyncManager {
       const cursor = state.cursor;
       if (!cursor || !cursor.userId) return;
       
+      // КЛЮЧЕВОЕ ИСПРАВЛЕНИЕ: Конвертируем RelativePosition в абсолютную позицию
+      let position: number;
+      
+      // Проверяем есть ли relativePosition (новый формат)
+      if (cursor.relativePosition) {
+        // Конвертируем относительную позицию в абсолютную
+        const absolutePosition = Y.createAbsolutePositionFromRelativePosition(
+          cursor.relativePosition,
+          this.ydoc
+        );
+        
+        // Если не удалось конвертировать (например, позиция была удалена), пропускаем курсор
+        if (!absolutePosition) {
+          console.warn('[Awareness] ⚠️ Не удалось конвертировать относительную позицию:', {
+            userId: cursor.userId,
+            noteId: cursor.noteId
+          });
+          return;
+        }
+        
+        position = absolutePosition.index;
+      } else if (cursor.position !== undefined) {
+        // Fallback для старого формата (абсолютная позиция)
+        position = cursor.position;
+      } else {
+        // Нет ни относительной ни абсолютной позиции
+        return;
+      }
+      
       // ⚠️ КРИТИЧНО: Фильтруем невалидные позиции (баг "слет в начало")
       // Пропускаем курсоры с position: 0 или отрицательными значениями
-      if (cursor.position === 0 || cursor.position < 0) {
+      if (position === 0 || position < 0) {
         console.warn('[Awareness] ⚠️ Отфильтрован невалидный курсор:', {
           userId: cursor.userId,
-          position: cursor.position,
+          position: position,
           noteId: cursor.noteId
         });
         return;
+      }
+      
+      // Конвертируем относительное выделение в абсолютное (если есть)
+      let selection: { start: number; end: number } | undefined = undefined;
+      if (cursor.relativeSelection) {
+        const absoluteStart = Y.createAbsolutePositionFromRelativePosition(
+          cursor.relativeSelection.start,
+          this.ydoc
+        );
+        const absoluteEnd = Y.createAbsolutePositionFromRelativePosition(
+          cursor.relativeSelection.end,
+          this.ydoc
+        );
+        
+        if (absoluteStart && absoluteEnd) {
+          selection = {
+            start: absoluteStart.index,
+            end: absoluteEnd.index
+          };
+        }
+      } else if (cursor.selection) {
+        // Fallback для старого формата
+        selection = cursor.selection;
       }
       
       // Получаем стабильный цвет для пользователя
@@ -691,11 +748,13 @@ export class DiffSyncManager {
         userId: cursor.userId,
         username: cursor.username,
         avatarUrl: cursor.avatarUrl,
-        position: cursor.position,
-        selection: cursor.selection,
+        position: position,
+        selection: selection,
         color,
         timestamp: Date.now(),
-        noteId: this.noteId
+        noteId: this.noteId,
+        connectionQuality: cursor.connectionQuality,
+        latency: cursor.latency
       });
     });
     
@@ -821,6 +880,7 @@ export class DiffSyncManager {
 
   /**
    * Обновление позиции курсора через Yjs Awareness (оптимизировано)
+   * ИСПОЛЬЗУЕТ ОТНОСИТЕЛЬНЫЕ ПОЗИЦИИ для автоматической коррекции при изменении текста
    */
   public updateCursor(position: number, selection?: { start: number; end: number }, userId?: string, username?: string, avatarUrl?: string) {
     if (!this.isActive) return;
@@ -857,18 +917,33 @@ export class DiffSyncManager {
     this.lastCursorSelection = selection ? { ...selection } : undefined;
     this.lastCursorUpdate = now;
     
-    // Обновляем локальное состояние awareness
+    // КЛЮЧЕВОЕ ИСПРАВЛЕНИЕ: Создаем относительную позицию в Yjs
+    // RelativePosition автоматически корректируется при вставке/удалении текста
+    const relativePosition = Y.createRelativePositionFromTypeIndex(this.ytext, position);
+    
+    // Создаем относительные позиции для выделения (если есть)
+    let relativeSelection: { start: Y.RelativePosition; end: Y.RelativePosition } | undefined = undefined;
+    if (selection) {
+      const relativeStart = Y.createRelativePositionFromTypeIndex(this.ytext, selection.start);
+      const relativeEnd = Y.createRelativePositionFromTypeIndex(this.ytext, selection.end);
+      relativeSelection = {
+        start: relativeStart,
+        end: relativeEnd
+      };
+    }
+    
+    // Обновляем локальное состояние awareness с относительными позициями
     // Awareness автоматически синхронизирует это состояние с другими клиентами
     this.awareness.setLocalStateField('cursor', {
       userId: userId || 'unknown',
       username,
       avatarUrl,
-      position,
-      selection,
+      relativePosition,        // ИСПОЛЬЗУЕМ RelativePosition вместо числа
+      relativeSelection,       // Относительное выделение
       noteId: this.noteId,
       timestamp: now,
-      connectionQuality: this.connectionQuality, // Качество соединения
-      latency: Math.round(this.currentLatency)    // RTT в миллисекундах
+      connectionQuality: this.connectionQuality,
+      latency: Math.round(this.currentLatency)
     });
   }
   
