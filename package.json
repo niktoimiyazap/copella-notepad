@@ -5,6 +5,9 @@
 	"type": "module",
 	"scripts": {
 		"dev": "vite dev",
+		"dev:ws": "tsx server/start-websocket.ts",
+		"dev:all": "concurrently \"npm run dev\" \"npm run dev:ws\"",
+		"start:ws": "node --import tsx server/start-websocket.ts",
 		"build": "vite build",
 		"preview": "vite preview",
 		"prepare": "svelte-kit sync || echo ''",

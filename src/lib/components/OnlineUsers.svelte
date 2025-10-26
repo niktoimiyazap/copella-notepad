@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { onMount, onDestroy } from 'svelte';
-	import { useRealtime } from '$lib/realtime';
+	import { useWebSocket } from '$lib/websocket';
 	
 	export let roomId: string;
 	
@@ -12,7 +12,7 @@
 		lastSeen?: Date;
 	}>>([]);
 	
-	const ws = useRealtime(roomId);
+	const ws = useWebSocket(roomId);
 	
 	function addOrUpdateUser(data: any) {
 		const index = onlineUsers.findIndex(u => u.userId === data.userId);

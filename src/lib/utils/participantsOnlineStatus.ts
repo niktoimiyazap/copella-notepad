@@ -1,8 +1,8 @@
 /**
- * Утилита для отслеживания онлайн статуса участников комнаты через Supabase Realtime
+ * Утилита для отслеживания онлайн статуса участников комнаты через WebSocket
  */
 
-import { useRealtime } from '$lib/realtime';
+import { useWebSocket } from '$lib/websocket';
 
 interface Participant {
 	id: string;
@@ -38,7 +38,7 @@ export async function initParticipantsOnlineTracking(
 	setParticipants: (participants: Participant[]) => void,
 	handlers?: OnlineStatusHandlers
 ): Promise<() => void> {
-	const ws = useRealtime(roomId);
+	const ws = useWebSocket(roomId);
 
 	// Обработчик подключения пользователя
 	const handleUserOnline = (message: any) => {

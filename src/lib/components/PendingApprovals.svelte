@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onMount, onDestroy } from 'svelte';
 	import { getPendingApprovals, approveRequest, rejectRequest, type PendingApproval } from '$lib/approvals';
-	import { useRealtime } from '$lib/realtime';
+	import { useWebSocket } from '$lib/websocket';
 	import { toast } from 'svelte-sonner';
 	
 	interface Props {
@@ -14,7 +14,7 @@
 	let loading = $state(true);
 	let error = $state<string | null>(null);
 	
-	const ws = useRealtime(roomId);
+	const ws = useWebSocket(roomId);
 	
 	async function loadApprovals() {
 		loading = true;
