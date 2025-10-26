@@ -8,6 +8,12 @@ import { OnlineStatusHandler } from './handlers/onlineStatusHandler.js';
 import { NoteContentHandler } from './handlers/noteContentHandler.js';
 import { DiffSyncHandler } from './handlers/diffSyncHandler.js';
 import type { WebSocketMessage } from './types.js';
+import { 
+  decodeBinaryMessage, 
+  isBinaryMessage, 
+  convertBinaryToJson,
+  convertJsonToBinary
+} from './binaryProtocol.js';
 
 export class WebSocketManager {
   private wss: WebSocketServer;
@@ -85,7 +91,14 @@ export class WebSocketManager {
    */
   private setupWebSocketServer(): void {
     this.wss.on('connection', async (ws: WebSocket, req) => {
-      console.log('[WebSocketManager] New WebSocket connection');
+      console.log('[WebSocketManager] New WebSocket connection (binary protocol enabled)');
+      
+      // Включаем TCP_NODELAY для минимальной задержки
+      // Отключает Nagle's algorithm - отправляет данные сразу без буферизации
+      const socket = (ws as any)._socket;
+      if (socket && socket.setNoDelay) {
+        socket.setNoDelay(true);
+      }
 
       // Получаем токен из URL параметров
       const url = new URL(req.url || '', `http://${req.headers.host}`);
@@ -114,7 +127,18 @@ export class WebSocketManager {
       // Обработка сообщений
       ws.on('message', async (data) => {
         try {
-          const message: WebSocketMessage = JSON.parse(data.toString());
+          let message: WebSocketMessage;
+          
+          // Поддерживаем как бинарный, так и JSON протоколы
+          if (isBinaryMessage(data)) {
+            // Бинарный протокол (оптимизированный)
+            const binaryMsg = decodeBinaryMessage(data as Buffer);
+            message = convertBinaryToJson(binaryMsg);
+          } else {
+            // Старый JSON протокол (fallback)
+            message = JSON.parse(data.toString());
+          }
+          
           await this.handleMessage(ws, message, userId, authResult.user!);
         } catch (error) {
           console.error('[WebSocketManager] Error parsing message:', error);

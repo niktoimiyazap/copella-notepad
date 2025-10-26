@@ -2,6 +2,12 @@
 import { supabase } from './supabase';
 import { browser } from '$app/environment';
 import { env } from '$env/dynamic/public';
+import { 
+  encodeBinaryMessage, 
+  decodeBinaryMessage, 
+  isBinaryMessage,
+  MessageType 
+} from './utils/binaryProtocol';
 
 // Функция для получения токена авторизации
 async function getAuthToken(): Promise<string | null> {
@@ -57,6 +63,7 @@ class WebSocketClient {
   private pingInterval: ReturnType<typeof setInterval> | null = null;
   private lastPongTime: number = 0;
   private pingTimeout: ReturnType<typeof setTimeout> | null = null;
+  private useBinaryProtocol = true; // Использовать оптимизированный бинарный протокол
 
   constructor() {
     // Автоматическое переподключение при потере соединения
@@ -150,6 +157,9 @@ class WebSocketClient {
       const wsBaseUrl = env.PUBLIC_WS_URL || 'ws://localhost:3001';
       const wsUrl = `${wsBaseUrl}?token=${token}`;
       this.ws = new WebSocket(wsUrl);
+      
+      // Устанавливаем тип данных для оптимизированного протокола
+      this.ws.binaryType = 'arraybuffer';
 
       return new Promise((resolve, reject) => {
         if (!this.ws) {
@@ -160,13 +170,24 @@ class WebSocketClient {
         this.ws.onopen = () => {
           this.isConnecting = false;
           this.reconnectAttempts = 0;
-          console.log('[WebSocket] Global connection established');
+          console.log('[WebSocket] Global connection established (binary protocol enabled)');
           resolve(true);
         };
 
         this.ws.onmessage = (event) => {
           try {
-            const message: WebSocketMessage = JSON.parse(event.data);
+            // Поддерживаем как бинарный, так и JSON протоколы
+            let message: WebSocketMessage;
+            
+            if (isBinaryMessage(event.data)) {
+              // Бинарный протокол (оптимизированный)
+              const binaryMsg = decodeBinaryMessage(event.data);
+              message = this.convertBinaryToJson(binaryMsg);
+            } else {
+              // Старый JSON протокол (fallback)
+              message = JSON.parse(event.data);
+            }
+            
             this.handleMessage(message);
           } catch (error) {
             console.error('[WebSocket] Error parsing message:', error);
@@ -419,10 +440,77 @@ class WebSocketClient {
     }
 
     try {
-      this.ws.send(JSON.stringify(message));
+      if (this.useBinaryProtocol && this.shouldUseBinaryProtocol(message.type)) {
+        // Используем оптимизированный бинарный протокол
+        const binaryData = this.convertJsonToBinary(message);
+        this.ws.send(binaryData);
+      } else {
+        // Fallback на JSON
+        this.ws.send(JSON.stringify(message));
+      }
     } catch (error) {
       console.error('[WebSocket] Error sending message:', error);
     }
+  }
+  
+  /**
+   * Проверка, нужно ли использовать бинарный протокол для этого типа сообщений
+   */
+  private shouldUseBinaryProtocol(messageType: string): boolean {
+    // Используем бинарный протокол для Yjs updates и awareness updates
+    return ['yjs_update', 'yjs_sync', 'awareness_update', 'yjs_sync_request'].includes(messageType);
+  }
+  
+  /**
+   * Конвертация JSON сообщения в бинарный формат
+   */
+  private convertJsonToBinary(message: any): Uint8Array {
+    const typeMap: Record<string, MessageType> = {
+      'yjs_sync_request': MessageType.YJS_SYNC_REQUEST,
+      'yjs_sync': MessageType.YJS_SYNC,
+      'yjs_update': MessageType.YJS_UPDATE,
+      'awareness_update': MessageType.AWARENESS_UPDATE,
+      'cursor_update': MessageType.CURSOR_UPDATE,
+      'cursor_remove': MessageType.CURSOR_REMOVE,
+      'note_saved': MessageType.NOTE_SAVED,
+      'join_room': MessageType.JOIN_ROOM,
+      'leave_room': MessageType.LEAVE_ROOM
+    };
+    
+    const type = typeMap[message.type] || MessageType.ERROR;
+    const roomId = message.room_id || '';
+    
+    // Конвертируем update из массива в Uint8Array (если есть)
+    let binaryPayload: Uint8Array | undefined;
+    if (message.data?.update && Array.isArray(message.data.update)) {
+      binaryPayload = new Uint8Array(message.data.update);
+    }
+    
+    return encodeBinaryMessage(type, roomId, message.data, binaryPayload);
+  }
+  
+  /**
+   * Конвертация бинарного сообщения в JSON формат
+   */
+  private convertBinaryToJson(binaryMsg: any): WebSocketMessage {
+    const typeMap: Record<MessageType, string> = {
+      [MessageType.YJS_SYNC_REQUEST]: 'yjs_sync_request',
+      [MessageType.YJS_SYNC]: 'yjs_sync',
+      [MessageType.YJS_UPDATE]: 'yjs_update',
+      [MessageType.AWARENESS_UPDATE]: 'awareness_update',
+      [MessageType.CURSOR_UPDATE]: 'cursor_update',
+      [MessageType.CURSOR_REMOVE]: 'cursor_remove',
+      [MessageType.NOTE_SAVED]: 'note_saved',
+      [MessageType.JOIN_ROOM]: 'join_room',
+      [MessageType.LEAVE_ROOM]: 'leave_room',
+      [MessageType.ERROR]: 'error'
+    };
+    
+    return {
+      type: typeMap[binaryMsg.type] as any,
+      room_id: binaryMsg.roomId,
+      data: binaryMsg.data
+    };
   }
 
   private handleMessage(message: WebSocketMessage) {

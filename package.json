@@ -39,6 +39,7 @@
 		"dotenv": "^17.2.3",
 		"iron-session": "^8.0.4",
 		"lib0": "^0.2.114",
+		"msgpackr": "^1.11.5",
 		"prisma": "^6.17.1",
 		"svelte-sonner": "^1.0.5",
 		"tsx": "^4.20.6",
