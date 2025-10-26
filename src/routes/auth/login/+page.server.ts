@@ -1,12 +1,10 @@
-import { redirect } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async ({ locals }) => {
-	// Если пользователь уже авторизован, перенаправляем на главную
-	if (locals.user) {
-		throw redirect(302, '/');
-	}
-	
-	return {};
+	// Редирект отключен - проверка авторизации только на клиенте
+	// Избегаем циклических редиректов между / и /auth/login
+	return {
+		user: locals.user || null
+	};
 };
 
