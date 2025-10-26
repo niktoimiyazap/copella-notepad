@@ -111,7 +111,7 @@ export class DiffSyncManager {
             awareness: this.awareness,
             // Используем СВОЙ signaling сервер!
             signaling: [
-              'wss://ws.copella.live:8443/signaling'
+              'wss://ws.copella.live/signaling'
             ],
             // STUN/TURN серверы для NAT traversal
             peerOpts: {
