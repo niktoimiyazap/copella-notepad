@@ -125,19 +125,41 @@
 						return;
 					}
 					
+					// Если пользователь печатает (редактор в фокусе) - сохраняем позицию курсора
+					let savedCursorPosition: number | null = null;
+					if (isFocused && document.activeElement === editorElement) {
+						const selection = window.getSelection();
+						if (selection && selection.rangeCount > 0) {
+							try {
+								const range = selection.getRangeAt(0);
+								const preRange = document.createRange();
+								preRange.selectNodeContents(editorElement);
+								preRange.setEnd(range.endContainer, range.endOffset);
+								savedCursorPosition = preRange.toString().length;
+							} catch (error) {
+								// Игнорируем ошибки
+							}
+						}
+					}
+					
 					// Сохраняем позицию скролла
 					const scrollTop = editorElement.scrollTop;
 					
 					// Применяем обновление
-					// Используем innerHTML для простоты, Yjs следит за конфликтами
 					editorElement.innerHTML = newContent;
 					content = newContent;
 					
 					// Восстанавливаем скролл
 					editorElement.scrollTop = scrollTop;
 					
-					// НЕ обновляем форматы при получении удаленных изменений
-					// Они обновятся когда пользователь кликнет или нажмет клавишу
+					// Восстанавливаем курсор если был сохранен
+					if (savedCursorPosition !== null) {
+						try {
+							restoreCursorPosition(editorElement, savedCursorPosition);
+						} catch (error) {
+							// Игнорируем ошибки восстановления курсора
+						}
+					}
 				},
 				onCursorsUpdate: (cursors) => {
 					remoteCursors = cursors;
@@ -589,6 +611,54 @@
 			return preRange.toString().length;
 		} catch (error) {
 			return null;
+		}
+	}
+
+	// Функция для восстановления курсора по числовой позиции
+	function restoreCursorPosition(element: HTMLElement, position: number): void {
+		try {
+			const walker = document.createTreeWalker(
+				element,
+				NodeFilter.SHOW_TEXT,
+				null
+			);
+
+			let currentPos = 0;
+			let node = walker.nextNode();
+
+			while (node) {
+				const textLength = (node.textContent || '').length;
+				
+				if (currentPos + textLength >= position) {
+					const offset = position - currentPos;
+					const range = document.createRange();
+					range.setStart(node, Math.min(offset, textLength));
+					range.setEnd(node, Math.min(offset, textLength));
+					
+					const selection = window.getSelection();
+					if (selection) {
+						selection.removeAllRanges();
+						selection.addRange(range);
+					}
+					return;
+				}
+				
+				currentPos += textLength;
+				node = walker.nextNode();
+			}
+
+			// Если не нашли позицию, ставим курсор в конец
+			const range = document.createRange();
+			range.selectNodeContents(element);
+			range.collapse(false);
+			
+			const selection = window.getSelection();
+			if (selection) {
+				selection.removeAllRanges();
+				selection.addRange(range);
+			}
+		} catch (error) {
+			// Игнорируем ошибки восстановления курсора
 		}
 	}
 	
