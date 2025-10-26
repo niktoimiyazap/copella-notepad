@@ -104,6 +104,7 @@ export function decodeBinaryMessage(buffer: Buffer): BinaryMessage {
  * 1. Быть Buffer
  * 2. Иметь минимум 5 байт (1 байт тип + 4 байта длина метаданных)
  * 3. Первый байт должен быть валидным типом сообщения (1-255)
+ * 4. НЕ быть JSON (не начинаться с '{' или '[')
  */
 export function isBinaryMessage(data: any): boolean {
   if (!Buffer.isBuffer(data)) {
@@ -118,16 +119,43 @@ export function isBinaryMessage(data: any): boolean {
   // Проверяем, что первый байт - валидный тип (не ASCII символ)
   const firstByte = data.readUInt8(0);
   
-  // ASCII символы '{' и '[' (начало JSON) имеют коды 123 и 91
-  // Наши типы сообщений: 1-9, 255
-  // Если это JSON, первый байт будет ASCII символом (обычно 123 = '{')
+  // КРИТИЧНО: ASCII символы '{' и '[' (начало JSON) имеют коды 123 и 91
+  // Если это JSON, сразу возвращаем false
   if (firstByte === 123 || firstByte === 91) {
+    return false;
+  }
+  
+  // Также проверяем что это не другие ASCII символы (20-126)
+  // Бинарные данные обычно имеют байты вне этого диапазона
+  if (firstByte >= 32 && firstByte <= 126 && firstByte !== 255) {
+    // Скорее всего это текст/JSON, не бинарный протокол
+    // Исключение: 255 - это наш ERROR тип
     return false;
   }
   
   // Проверяем, что это валидный тип сообщения из нашего протокола
   const validTypes = [1, 2, 3, 4, 5, 6, 7, 8, 9, 255];
-  return validTypes.includes(firstByte);
+  if (!validTypes.includes(firstByte)) {
+    return false;
+  }
+  
+  // Дополнительная проверка: пробуем прочитать длину метаданных
+  // Она должна быть разумной (не больше размера всего сообщения)
+  try {
+    const metadataLength = data.readUInt32BE(1);
+    if (metadataLength > data.length - 5) {
+      // Длина метаданных больше чем доступно в буфере - это не наш формат
+      return false;
+    }
+    // Метаданные не должны быть слишком большими (макс 10MB)
+    if (metadataLength > 10 * 1024 * 1024) {
+      return false;
+    }
+  } catch (error) {
+    return false;
+  }
+  
+  return true;
 }
 
 /**
