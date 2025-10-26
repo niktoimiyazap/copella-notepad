@@ -1,10 +1,15 @@
 import type { PageServerLoad } from './$types';
+import { redirect } from '@sveltejs/kit';
 
 export const load: PageServerLoad = async ({ locals }) => {
-	// Возвращаем пользователя если есть в серверной сессии
-	// Но не делаем redirect если нет - клиент сам проверит через localStorage
+	// Если пользователь не авторизован - редирект на страницу входа
+	if (!locals.user) {
+		throw redirect(302, '/auth/login');
+	}
+	
+	// Возвращаем данные пользователя
 	return {
-		user: locals.user || null
+		user: locals.user
 	};
 };
 

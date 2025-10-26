@@ -27,6 +27,14 @@
 	$effect(() => {
 		isMobile = isMobileDevice;
 	});
+	
+	// Effect to sync store with server data when data.user changes
+	$effect(() => {
+		// Синхронизируем store с серверными данными при каждом изменении
+		if (data.user !== undefined) {
+			userActions.initializeFromServer(data.user);
+		}
+	});
 
 	function toggleLeftSidebar() {
 		isLeftSidebarOpen = !isLeftSidebarOpen;
@@ -47,10 +55,9 @@
 	// Инициализируем пользователя из серверных данных при монтировании
 	// Это происходит один раз и предотвращает "мерцание" UI
 	onMount(() => {
-		// Если store еще не инициализирован, инициализируем его серверными данными
-		if (!userActions.isInitialized()) {
-			userActions.initializeFromServer(data.user);
-		}
+		// Всегда синхронизируем store с серверными данными при загрузке
+		// Это гарантирует что данные актуальны
+		userActions.initializeFromServer(data.user);
 
 		// Отслеживаем размер окна для определения мобильного устройства
 		windowWidth = window.innerWidth;

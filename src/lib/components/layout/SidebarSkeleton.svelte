@@ -79,14 +79,8 @@
 	}
 	
 	.skeleton-button--primary {
-		background: linear-gradient(
-			90deg,
-			rgba(74, 144, 226, 0.2) 25%,
-			rgba(74, 144, 226, 0.3) 50%,
-			rgba(74, 144, 226, 0.2) 75%
-		);
-		background-size: 200% 100%;
-		animation: skeleton-loading 1.5s ease-in-out infinite;
+		background-color: rgba(74, 144, 226, 0.15);
+		animation: skeleton-pulse 1.5s ease-in-out infinite;
 	}
 	
 	.sidebar-nav {
