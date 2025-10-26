@@ -52,10 +52,10 @@
 		}
 
 		if (user) {
-			// Перенаправляем на главную страницу
+			// Перенаправляем на главную страницу с полной перезагрузкой
+			// чтобы серверная сессия обновилась
 			console.log('[Login page] Login successful, redirecting to home page');
-			isLoading = false;
-			await goto('/');
+			window.location.href = '/';
 		} else {
 			isLoading = false;
 		}
