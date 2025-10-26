@@ -81,6 +81,10 @@
 	// Throttle для предотвращения слишком частых обновлений при быстрой печати
 	let lastInputTime = 0;
 	let inputThrottleDelay = 16; // ~60 FPS, достаточно для плавности
+	
+	// Флаг для отслеживания активного ввода текста
+	let isTyping = false;
+	let typingTimeout: ReturnType<typeof setTimeout> | null = null;
 
 	// Реактивно обновляем содержимое редактора при изменении выбранной заметки
 	$effect(() => {
@@ -125,6 +129,13 @@
 						return;
 					}
 					
+					// КРИТИЧНО: Если пользователь активно печатает, откладываем обновление
+					// чтобы не сбрасывать курсор во время ввода
+					if (isTyping) {
+						// Отложим обновление на короткое время после завершения печати
+						return;
+					}
+					
 					// Если пользователь печатает (редактор в фокусе) - сохраняем позицию курсора
 					let savedCursorPosition: number | null = null;
 					if (isFocused && document.activeElement === editorElement) {
@@ -145,21 +156,28 @@
 					// Сохраняем позицию скролла
 					const scrollTop = editorElement.scrollTop;
 					
-					// Применяем обновление
-					editorElement.innerHTML = newContent;
-					content = newContent;
-					
-					// Восстанавливаем скролл
-					editorElement.scrollTop = scrollTop;
-					
-					// Восстанавливаем курсор если был сохранен
-					if (savedCursorPosition !== null) {
-						try {
-							restoreCursorPosition(editorElement, savedCursorPosition);
-						} catch (error) {
-							// Игнорируем ошибки восстановления курсора
+					// Применяем обновление используя requestAnimationFrame для плавности
+					requestAnimationFrame(() => {
+						if (!editorElement) return;
+						
+						editorElement.innerHTML = newContent;
+						content = newContent;
+						
+						// Восстанавливаем скролл
+						editorElement.scrollTop = scrollTop;
+						
+						// Восстанавливаем курсор если был сохранен
+						if (savedCursorPosition !== null) {
+							// Используем микрозадачу для гарантии что DOM обновился
+							queueMicrotask(() => {
+								try {
+									restoreCursorPosition(editorElement!, savedCursorPosition);
+								} catch (error) {
+									// Игнорируем ошибки восстановления курсора
+								}
+							});
 						}
-					}
+					});
 				},
 				onCursorsUpdate: (cursors) => {
 					remoteCursors = cursors;
@@ -206,6 +224,9 @@
 		if (mouseMoveThrottleTimeout) {
 			clearTimeout(mouseMoveThrottleTimeout);
 		}
+		if (typingTimeout) {
+			clearTimeout(typingTimeout);
+		}
 
 		// Очищаем менеджер синхронизации
 		if (diffSyncManager) {
@@ -230,6 +251,19 @@
 
 	function handleInput(event: Event) {
 		const target = event.target as HTMLDivElement;
+		
+		// Устанавливаем флаг активного ввода
+		isTyping = true;
+		
+		// Сбрасываем предыдущий таймер
+		if (typingTimeout) {
+			clearTimeout(typingTimeout);
+		}
+		
+		// Сбрасываем флаг isTyping через короткую паузу после последнего символа
+		typingTimeout = setTimeout(() => {
+			isTyping = false;
+		}, 300); // 300мс паузы после печати считается окончанием ввода
 		
 		// Убираем placeholder при вводе текста
 		if (target.innerHTML === '<br>' || target.innerHTML === '') {
