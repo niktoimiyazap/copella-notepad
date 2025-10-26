@@ -79,7 +79,7 @@ export class DiffSyncManager {
   
   // Throttling для awareness updates
   private lastAwarenessUpdate: number = 0;
-  private awarenessThrottle: number = 100; // 100ms между обновлениями
+  private awarenessThrottle: number = 50; // 50ms между обновлениями (оптимально для курсоров, как в Figma)
   private pendingAwarenessUpdate: ReturnType<typeof setTimeout> | null = null;
 
   // Цвета для пользователей
@@ -99,9 +99,9 @@ export class DiffSyncManager {
     this.onSyncStatus = options.onSyncStatus;
 
     // Адаптивный throttle для курсора
-    // На мобильных: 200ms = 5 обновлений в секунду (достаточно для отображения курсора)
-    // На десктопе: 100ms = 10 обновлений в секунду (оптимальный баланс между плавностью и производительностью)
-    this.cursorThrottle = this.isMobile ? 200 : 100;
+    // На мобильных: 100ms = 10 обновлений в секунду (достаточно для отображения курсора)
+    // На десктопе: 50ms = 20 обновлений в секунду (оптимально для real-time курсоров, как в Figma)
+    this.cursorThrottle = this.isMobile ? 100 : 50;
 
     // Создаем батчер для cursor updates (только для мобильных)
     if (this.isMobile) {
@@ -552,6 +552,16 @@ export class DiffSyncManager {
     const states = this.awareness.getStates();
     const localClientId = this.awareness.clientID;
     
+    // 🔍 ДЕБАГ: Логируем все awareness states
+    console.log('[Awareness Change]', {
+      totalStates: states.size,
+      states: Array.from(states.entries()).map(([clientId, state]) => ({
+        clientId,
+        cursor: state.cursor,
+        isLocal: clientId === localClientId
+      }))
+    });
+    
     // Очищаем старые курсоры
     this.remoteCursors.clear();
     
@@ -563,6 +573,17 @@ export class DiffSyncManager {
       const cursor = state.cursor;
       if (!cursor || !cursor.userId) return;
       
+      // ⚠️ КРИТИЧНО: Фильтруем невалидные позиции (баг "слет в начало")
+      // Пропускаем курсоры с position: 0 или отрицательными значениями
+      if (cursor.position === 0 || cursor.position < 0) {
+        console.warn('[Awareness] ⚠️ Отфильтрован невалидный курсор:', {
+          userId: cursor.userId,
+          position: cursor.position,
+          noteId: cursor.noteId
+        });
+        return;
+      }
+      
       // Получаем стабильный цвет для пользователя
       const color = this.getUserColor(cursor.userId);
       
@@ -570,12 +591,22 @@ export class DiffSyncManager {
         userId: cursor.userId,
         username: cursor.username,
         avatarUrl: cursor.avatarUrl,
-        position: cursor.position || 0,
+        position: cursor.position,
         selection: cursor.selection,
         color,
         timestamp: Date.now(),
         noteId: this.noteId
       });
+    });
+    
+    // 🔍 ДЕБАГ: Логируем обновленные курсоры
+    console.log('[Awareness] ✅ Обновлено remoteCursors:', {
+      count: this.remoteCursors.size,
+      cursors: Array.from(this.remoteCursors.entries()).map(([userId, cursor]) => ({
+        userId,
+        position: cursor.position,
+        selection: cursor.selection
+      }))
     });
     
     this.onCursorsUpdate(new Map(this.remoteCursors));

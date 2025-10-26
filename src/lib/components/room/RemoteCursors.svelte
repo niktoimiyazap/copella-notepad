@@ -12,6 +12,11 @@
 	let cursorElements = new Map<string, HTMLElement>();
 	let animationFrame: number | null = null;
 	let scrollAnimationFrame: number | null = null;
+	
+	// Интерполяция для плавного движения курсоров
+	let cursorTargetPositions = new Map<string, { top: number; left: number }>();
+	let cursorCurrentPositions = new Map<string, { top: number; left: number }>();
+	let interpolationFrame: number | null = null;
 
 	/**
 	 * Получение позиции для курсора в пикселях
@@ -117,21 +122,85 @@
 	/**
 	 * Обновление позиций курсоров
 	 */
+	/**
+	 * Обновление позиций всех курсоров с интерполяцией
+	 */
 	function updateCursors() {
 		if (!editorElement) return;
 
 		for (const [userId, cursor] of cursors.entries()) {
-			const position = getPixelPosition(cursor.position);
+			const targetPosition = getPixelPosition(cursor.position);
 			
-			if (position) {
+			if (targetPosition) {
 				let cursorEl = cursorElements.get(userId);
 				
 				if (cursorEl) {
-					// Используем transform вместо top/left для лучшей производительности
-					cursorEl.style.transform = `translate(${position.left}px, ${position.top}px)`;
+					// Сохраняем целевую позицию для интерполяции
+					cursorTargetPositions.set(userId, targetPosition);
+					
+					// Инициализируем текущую позицию если её нет
+					if (!cursorCurrentPositions.has(userId)) {
+						cursorCurrentPositions.set(userId, { ...targetPosition });
+						cursorEl.style.transform = `translate(${targetPosition.left}px, ${targetPosition.top}px)`;
+					}
 				}
 			}
 		}
+		
+		// Запускаем интерполяцию если она не запущена
+		if (!interpolationFrame) {
+			startInterpolation();
+		}
+	}
+	
+	/**
+	 * Плавная интерполяция курсоров (убирает рывки)
+	 */
+	function startInterpolation() {
+		function interpolate() {
+			let hasMovement = false;
+			
+			cursorElements.forEach((element, userId) => {
+				const target = cursorTargetPositions.get(userId);
+				const current = cursorCurrentPositions.get(userId);
+				
+				if (!target || !current) return;
+				
+				// Коэффициент интерполяции (0.3 = плавное движение)
+				const lerpFactor = 0.3;
+				
+				// Вычисляем новую позицию
+				const newLeft = current.left + (target.left - current.left) * lerpFactor;
+				const newTop = current.top + (target.top - current.top) * lerpFactor;
+				
+				// Проверяем достигли ли цели (с погрешностью 0.5px)
+				const distanceLeft = Math.abs(target.left - newLeft);
+				const distanceTop = Math.abs(target.top - newTop);
+				
+				if (distanceLeft > 0.5 || distanceTop > 0.5) {
+					hasMovement = true;
+					
+					// Обновляем текущую позицию
+					cursorCurrentPositions.set(userId, { left: newLeft, top: newTop });
+					
+					// Применяем к элементу
+					element.style.transform = `translate(${newLeft}px, ${newTop}px)`;
+				} else {
+					// Достигли цели - устанавливаем точную позицию
+					cursorCurrentPositions.set(userId, { ...target });
+					element.style.transform = `translate(${target.left}px, ${target.top}px)`;
+				}
+			});
+			
+			// Продолжаем интерполяцию если есть движение
+			if (hasMovement) {
+				interpolationFrame = requestAnimationFrame(interpolate);
+			} else {
+				interpolationFrame = null;
+			}
+		}
+		
+		interpolationFrame = requestAnimationFrame(interpolate);
 	}
 
 	/**
@@ -226,6 +295,9 @@
 		if (scrollAnimationFrame) {
 			cancelAnimationFrame(scrollAnimationFrame);
 		}
+		if (interpolationFrame) {
+			cancelAnimationFrame(interpolationFrame);
+		}
 	});
 </script>
 
@@ -283,8 +355,7 @@
 		left: 0;
 		pointer-events: none;
 		will-change: transform;
-		/* Мгновенное отслеживание курсора для real-time синхронизации */
-		transition: transform 30ms linear;
+		/* Убираем CSS transition - используем JavaScript интерполяцию для плавности */
 	}
 
 	.cursor-line {
