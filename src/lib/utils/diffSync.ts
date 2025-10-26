@@ -395,23 +395,26 @@ export class DiffSyncManager {
     
     this.onCursorsUpdate(new Map(this.remoteCursors));
     
-    // Удаляем старые курсоры (более 30 секунд для сохранения при переключении между заметками)
+    // Удаляем старые курсоры (более 5 секунд = пользователь покинул заметку)
     const now = Date.now();
     for (const [userId, cursor] of this.remoteCursors.entries()) {
-      if (now - cursor.timestamp > 30000) {
+      if (now - cursor.timestamp > 5000) {
         this.remoteCursors.delete(userId);
       }
     }
   }
 
   /**
-   * Обработка удаления курсора (когда пользователь убирает фокус)
+   * Обработка удаления курсора (когда пользователь покидает заметку)
    */
   private handleCursorRemove(data: { noteId?: string; userId: string }) {
-    // Удаляем курсор только если он для текущей заметки
-    // Это позволяет сохранять курсоры при переключении между заметками
-    const cursor = this.remoteCursors.get(data.userId);
-    if (cursor && (!data.noteId || cursor.noteId === data.noteId)) {
+    // Если указан noteId и это не текущая заметка - игнорируем
+    if (data.noteId && data.noteId !== this.noteId) {
+      return;
+    }
+    
+    // Удаляем курсор пользователя
+    if (this.remoteCursors.has(data.userId)) {
       this.remoteCursors.delete(data.userId);
       this.onCursorsUpdate(new Map(this.remoteCursors));
     }
@@ -643,6 +646,17 @@ export class DiffSyncManager {
    */
   public destroy() {
     this.isActive = false;
+    
+    // Отправляем cursor_remove при уничтожении менеджера (смена заметки)
+    if (websocketClient) {
+      websocketClient.send({
+        type: 'cursor_remove',
+        room_id: this.roomId,
+        data: {
+          noteId: this.noteId
+        }
+      });
+    }
     
     // Флашим и уничтожаем батчер
     if (this.cursorBatcher) {
