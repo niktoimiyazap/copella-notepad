@@ -94,12 +94,23 @@ export class DiffSyncManager {
         const content = this.ytext.toString();
         const contentHash = this.hashContent(content);
         
+        console.log('[YjsSync] Remote update received:', {
+          contentHash,
+          lastAppliedHash: this.lastAppliedRemoteHash,
+          isDuplicate: contentHash === this.lastAppliedRemoteHash,
+          contentLength: content.length
+        });
+        
         // КРИТИЧНО: Проверяем хеш чтобы не применять одинаковый контент повторно
-        if (contentHash === this.lastAppliedRemoteHash) return;
+        if (contentHash === this.lastAppliedRemoteHash) {
+          console.warn('[YjsSync] BLOCKED: Same remote hash, skipping to prevent loop');
+          return;
+        }
         
         // Сохраняем хеш примененного remote контента
         this.lastAppliedRemoteHash = contentHash;
         
+        console.log('[YjsSync] Applying remote update to editor');
         this.onContentUpdate(content);
       }
     });
@@ -431,10 +442,20 @@ export class DiffSyncManager {
    * Применение накопленных изменений контента
    */
   private applyContentUpdate() {
-    if (!this.pendingContentUpdate || !this.isActive || !this.isInitialized) return;
+    if (!this.pendingContentUpdate || !this.isActive || !this.isInitialized) {
+      console.log('[YjsSync] applyContentUpdate skipped:', {
+        hasPending: !!this.pendingContentUpdate,
+        isActive: this.isActive,
+        isInitialized: this.isInitialized
+      });
+      return;
+    }
     
     // Защита от зацикливания - не обрабатываем если уже в процессе
-    if (this.updateInProgress) return;
+    if (this.updateInProgress) {
+      console.log('[YjsSync] Update already in progress, skipping');
+      return;
+    }
     
     const newContent = this.pendingContentUpdate;
     this.pendingContentUpdate = null;
@@ -442,11 +463,25 @@ export class DiffSyncManager {
     const currentContent = this.ytext.toString();
     
     // Игнорируем если контент не изменился
-    if (newContent === currentContent) return;
+    if (newContent === currentContent) {
+      console.log('[YjsSync] Content identical, skipping');
+      return;
+    }
     
     // КРИТИЧНО: Проверяем хеш чтобы не отправлять одинаковые обновления
     const newHash = this.hashContent(newContent);
-    if (newHash === this.lastSentContentHash) return;
+    console.log('[YjsSync] Content hash check:', {
+      newHash,
+      lastSentHash: this.lastSentContentHash,
+      isDuplicate: newHash === this.lastSentContentHash,
+      newLength: newContent.length,
+      currentLength: currentContent.length
+    });
+    
+    if (newHash === this.lastSentContentHash) {
+      console.warn('[YjsSync] BLOCKED: Same content hash, skipping duplicate update');
+      return;
+    }
     
     // Убрана проверка на "большое изменение" - она блокировала нормальные обновления
     // Yjs сам обеспечивает правильную синхронизацию через CRDT
@@ -485,6 +520,8 @@ export class DiffSyncManager {
       
       // Сохраняем хеш отправленного контента для дедупликации
       this.lastSentContentHash = newHash;
+      
+      console.log('[YjsSync] ✅ Update applied successfully, new hash saved:', newHash);
       
       // Yjs автоматически генерирует update event, который отправится на сервер
       // через обработчик ydoc.on('update') в конструкторе
