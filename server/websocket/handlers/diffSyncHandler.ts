@@ -64,8 +64,6 @@ export class DiffSyncHandler {
       // Сохраняем в памяти
       noteDocs.set(noteId, ydoc);
 
-      console.log('[YjsSyncHandler] Created Y.Doc for note:', noteId, 'content length:', note.content?.length || 0);
-
       return ydoc;
     } catch (error) {
       console.error('[YjsSyncHandler] Error creating doc:', error);
@@ -86,8 +84,6 @@ export class DiffSyncHandler {
     }
   ): Promise<void> {
     const { noteId, stateVector } = data;
-    
-    console.log('[YjsSyncHandler] Sync request for note:', noteId);
 
     try {
       // Проверяем доступ
@@ -118,8 +114,6 @@ export class DiffSyncHandler {
           update: Array.from(update)
         }
       });
-
-      console.log('[YjsSyncHandler] Sent sync response, update size:', update.length);
 
     } catch (error) {
       console.error('[YjsSyncHandler] Error handling sync request:', error);
@@ -353,8 +347,6 @@ export class DiffSyncHandler {
       const ytext = ydoc.getText('content');
       const content = ytext.toString();
 
-      console.log(`[YjsSyncHandler] Saving note ${noteId} to database, length: ${content.length}`);
-
       await prisma.note.update({
         where: { id: noteId },
         data: {
@@ -362,8 +354,6 @@ export class DiffSyncHandler {
           updatedAt: new Date()
         }
       });
-
-      console.log(`[YjsSyncHandler] Note ${noteId} saved successfully`);
 
       // Уведомляем о сохранении
       const note = await prisma.note.findUnique({

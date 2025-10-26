@@ -90,15 +90,6 @@ export class DiffSyncManager {
         
         // Применяем только удаленные изменения
         const content = this.ytext.toString();
-        const contentHash = this.hashContent(content);
-        
-        // Хеш-дедупликация отключена - Yjs сам управляет дедупликацией
-        console.log('[YjsSync] Remote update received:', {
-          contentHash,
-          contentLength: content.length
-        });
-        
-        console.log('[YjsSync] Applying remote update to editor');
         this.onContentUpdate(content);
       }
     });
@@ -192,8 +183,6 @@ export class DiffSyncManager {
       return;
     }
     
-    console.log('[YjsSync] Requesting sync for note:', this.noteId);
-    
     // Создаем state vector для запроса отсутствующих updates
     const stateVector = Y.encodeStateVector(this.ydoc);
     
@@ -212,8 +201,6 @@ export class DiffSyncManager {
    */
   private handleYjsSync(data: { noteId: string; update: number[] }) {
     if (data.noteId !== this.noteId) return;
-    
-    console.log('[YjsSync] Received sync, update size:', data.update.length);
     
     try {
       // Валидация данных
@@ -235,13 +222,10 @@ export class DiffSyncManager {
       // Получаем текущий контент
       const content = this.ytext.toString();
       this.onContentUpdate(content);
-      
-      console.log('[YjsSync] Sync complete, content length:', content.length);
     } catch (error) {
       console.error('[YjsSync] Error applying sync update:', error);
       // Не выставляем статус error, просто логируем
       // Документ может синхронизироваться через последующие updates
-      console.warn('[YjsSync] Continuing despite sync error, waiting for updates...');
       this.isInitialized = true; // Все равно помечаем как инициализированный
     }
   }
@@ -419,11 +403,10 @@ export class DiffSyncManager {
       clearTimeout(this.contentUpdateTimeout);
     }
     
-    // Минимальный батчинг для группировки быстрых изменений
-    // 8ms = оптимальный баланс между скоростью и производительностью
+    // Немедленная синхронизация для минимальной задержки
     this.contentUpdateTimeout = setTimeout(() => {
       this.applyContentUpdate();
-    }, 8);
+    }, 0);
   }
 
   /**
@@ -431,17 +414,11 @@ export class DiffSyncManager {
    */
   private applyContentUpdate() {
     if (!this.pendingContentUpdate || !this.isActive || !this.isInitialized) {
-      console.log('[YjsSync] applyContentUpdate skipped:', {
-        hasPending: !!this.pendingContentUpdate,
-        isActive: this.isActive,
-        isInitialized: this.isInitialized
-      });
       return;
     }
     
     // Защита от зацикливания - не обрабатываем если уже в процессе
     if (this.updateInProgress) {
-      console.log('[YjsSync] Update already in progress, skipping');
       return;
     }
     
@@ -452,21 +429,8 @@ export class DiffSyncManager {
     
     // Игнорируем если контент не изменился
     if (newContent === currentContent) {
-      console.log('[YjsSync] Content identical, skipping');
       return;
     }
-    
-    // Хеш-дедупликация отключена - Yjs сам обеспечивает правильную дедупликацию через CRDT
-    const newHash = this.hashContent(newContent);
-    console.log('[YjsSync] Applying local update:', {
-      hash: newHash,
-      newLength: newContent.length,
-      currentLength: currentContent.length,
-      diff: newContent.length - currentContent.length
-    });
-    
-    // Убрана проверка на "большое изменение" - она блокировала нормальные обновления
-    // Yjs сам обеспечивает правильную синхронизацию через CRDT
     
     // Вычисляем умный diff: находим общий префикс и суффикс
     const prefixLen = this.commonPrefixLength(currentContent, newContent);
@@ -499,8 +463,6 @@ export class DiffSyncManager {
           this.ytext.insert(deleteStart, insertText);
         }
       }, 'local'); // Указываем origin 'local' для отслеживания в UndoManager
-      
-      console.log('[YjsSync] ✅ Update applied successfully, hash:', newHash);
       
       // Yjs автоматически генерирует update event, который отправится на сервер
       // через обработчик ydoc.on('update') в конструкторе
