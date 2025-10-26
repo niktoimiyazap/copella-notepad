@@ -103,25 +103,23 @@
 		
 		// Проверяем изменился ли ID заметки
 		if (currentNoteId && roomId && currentNoteId !== lastSyncManagerNoteId) {
+			console.log('[Editor] Switching to note:', currentNoteId);
+			
 			// Обновляем последний ID
 			lastSyncManagerNoteId = currentNoteId;
 			
 			// Очищаем старый менеджер
 			if (diffSyncManager) {
+				console.log('[Editor] Destroying old DiffSyncManager');
 				diffSyncManager.destroy();
 			}
 
 			// Создаем новый менеджер для текущей заметки
+			console.log('[Editor] Creating new DiffSyncManager for note:', currentNoteId);
 			diffSyncManager = new DiffSyncManager({
 				noteId: currentNoteId,
 				roomId: roomId,
 				onContentUpdate: (newContent) => {
-					// КРИТИЧНО: Полностью игнорируем удаленные обновления если редактор в фокусе!
-					// Это предотвращает любые прыжки курсора
-					if (isFocused) {
-						return;
-					}
-					
 					// Применяем обновление только если есть реальная разница
 					if (!editorElement) return;
 					
@@ -131,17 +129,21 @@
 						return;
 					}
 					
+					console.log('[Editor] Applying remote update, length:', newContent.length);
+					
 					// Сохраняем позицию скролла
 					const scrollTop = editorElement.scrollTop;
 					
 					// Применяем обновление
+					// Используем innerHTML для простоты, Yjs следит за конфликтами
 					editorElement.innerHTML = newContent;
 					content = newContent;
 					
 					// Восстанавливаем скролл
 					editorElement.scrollTop = scrollTop;
 					
-					updateActiveFormats();
+					// НЕ обновляем форматы при получении удаленных изменений
+					// Они обновятся когда пользователь кликнет или нажмет клавишу
 				},
 				onCursorsUpdate: (cursors) => {
 					remoteCursors = cursors;

@@ -225,6 +225,8 @@ export class DiffSyncManager {
   private handleYjsUpdate(data: { noteId: string; update: number[] }) {
     if (data.noteId !== this.noteId) return;
     
+    console.log('[YjsSync] Received update for note:', data.noteId, 'size:', data.update?.length);
+    
     try {
       // Валидация данных
       if (!data.update || !Array.isArray(data.update) || data.update.length === 0) {
@@ -237,6 +239,8 @@ export class DiffSyncManager {
       
       // Применяем update к документу (origin 'server' чтобы не отправлять обратно)
       Y.applyUpdate(this.ydoc, update, 'server');
+      
+      console.log('[YjsSync] Update applied successfully, new content length:', this.ytext.toString().length);
     } catch (error: any) {
       // Yjs может выбросить ошибку если update уже применен или некорректен
       // Это не критично - просто логируем предупреждение
