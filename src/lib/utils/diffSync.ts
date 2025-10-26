@@ -331,10 +331,10 @@ export class DiffSyncManager {
     
     this.onCursorsUpdate(new Map(this.remoteCursors));
     
-    // Удаляем старые курсоры (более 5 секунд, было 10)
+    // Удаляем старые курсоры (более 30 секунд для сохранения при переключении между заметками)
     const now = Date.now();
     for (const [userId, cursor] of this.remoteCursors.entries()) {
-      if (now - cursor.timestamp > 5000) {
+      if (now - cursor.timestamp > 30000) {
         this.remoteCursors.delete(userId);
       }
     }
@@ -344,10 +344,13 @@ export class DiffSyncManager {
    * Обработка удаления курсора (когда пользователь убирает фокус)
    */
   private handleCursorRemove(data: { noteId?: string; userId: string }) {
-    // Удаляем курсор пользователя безусловно
-    // Это гарантирует что курсор исчезнет при blur/visibility change
-    this.remoteCursors.delete(data.userId);
-    this.onCursorsUpdate(new Map(this.remoteCursors));
+    // Удаляем курсор только если он для текущей заметки
+    // Это позволяет сохранять курсоры при переключении между заметками
+    const cursor = this.remoteCursors.get(data.userId);
+    if (cursor && (!data.noteId || cursor.noteId === data.noteId)) {
+      this.remoteCursors.delete(data.userId);
+      this.onCursorsUpdate(new Map(this.remoteCursors));
+    }
   }
 
 
