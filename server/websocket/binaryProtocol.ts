@@ -33,17 +33,17 @@ export function encodeBinaryMessage(
   data?: any,
   binaryPayload?: Uint8Array
 ): Buffer {
-  // Метаданные
+  // Метаданные (без бинарных данных - они будут в payload)
   const metadata = {
     roomId,
-    ...(data && typeof data === 'object' && !data.update ? data : {})
+    ...(data && typeof data === 'object' ? data : {})
   };
   
   const metadataBytes = pack(metadata);
   const metadataLength = metadataBytes.byteLength;
   
-  // Бинарный payload (если есть)
-  const payload = binaryPayload || (data?.update instanceof Uint8Array ? data.update : null);
+  // Бинарный payload
+  const payload = binaryPayload;
   const payloadLength = payload ? payload.byteLength : 0;
   
   // Общий размер
