@@ -200,6 +200,19 @@ export class WebSocketManager {
             this.connectionHandler.handlePing(ws, userId, room_id);
           }
           break;
+        
+        case 'latency_ping':
+          // Отправляем pong обратно для измерения latency
+          if (room_id) {
+            ws.send(JSON.stringify({
+              type: 'latency_pong',
+              room_id: room_id,
+              data: {
+                timestamp: message.data?.timestamp || Date.now()
+              }
+            }));
+          }
+          break;
 
         case 'update_online_status':
           if (room_id) {

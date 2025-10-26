@@ -5,6 +5,8 @@ import { IndexeddbPersistence } from 'y-indexeddb';
 import { websocketClient } from '../websocket';
 import { WebSocketBatcher } from './websocketBatcher';
 
+export type ConnectionQuality = 'excellent' | 'good' | 'poor' | 'offline';
+
 export interface CursorInfo {
   userId: string;
   username?: string;
@@ -14,6 +16,8 @@ export interface CursorInfo {
   color: string;
   timestamp: number;
   noteId?: string;
+  connectionQuality?: ConnectionQuality; // Качество соединения пользователя
+  latency?: number; // RTT в миллисекундах
 }
 
 // Детект мобильного устройства
@@ -81,6 +85,14 @@ export class DiffSyncManager {
   private lastAwarenessUpdate: number = 0;
   private awarenessThrottle: number = 50; // 50ms между обновлениями (оптимально для курсоров, как в Figma)
   private pendingAwarenessUpdate: ReturnType<typeof setTimeout> | null = null;
+
+  // Мониторинг качества соединения
+  private pingStartTime: number = 0;
+  private latencyHistory: number[] = []; // История последних 10 измерений
+  private readonly MAX_LATENCY_HISTORY = 10;
+  private currentLatency: number = 0;
+  private connectionQuality: ConnectionQuality = 'excellent';
+  private latencyCheckInterval: ReturnType<typeof setInterval> | null = null;
 
   // Цвета для пользователей
   private userColors = new Map<string, string>();
@@ -196,6 +208,7 @@ export class DiffSyncManager {
       websocketClient.onMessage('awareness_update', this.messageHandler);
       // cursor_update и cursor_remove больше не нужны - awareness уже содержит эту информацию
       websocketClient.onMessage('note_saved', this.messageHandler);
+      websocketClient.onMessage('latency_pong', this.messageHandler); // Обработка pong для latency
       
       // Обрабатываем переподключение WebSocket
       websocketClient.onMessage('reconnected', async () => {
@@ -204,6 +217,9 @@ export class DiffSyncManager {
 
       // Запрашиваем начальное состояние документа
       await this.requestSync();
+      
+      // Запускаем мониторинг качества соединения
+      this.startLatencyMonitoring();
       
       this.onSyncStatus('connected');
     } catch (error) {
@@ -259,6 +275,13 @@ export class DiffSyncManager {
                 this.onSyncStatus('connected');
               }
             }, 2000);
+          }
+          break;
+        
+        case 'latency_pong':
+          // Обрабатываем pong для вычисления latency
+          if (message.data?.timestamp) {
+            this.handleLatencyPong(message.data.timestamp);
           }
           break;
       }
@@ -546,21 +569,98 @@ export class DiffSyncManager {
   }
 
   /**
+   * Вычисление качества соединения на основе latency
+   */
+  private calculateConnectionQuality(latency: number): ConnectionQuality {
+    if (latency < 0) return 'offline';
+    if (latency < 100) return 'excellent'; // <100ms - отлично
+    if (latency < 300) return 'good';      // 100-300ms - хорошо
+    return 'poor';                          // >300ms - плохо
+  }
+
+  /**
+   * Обновление latency и качества соединения
+   */
+  private updateLatency(latency: number) {
+    this.currentLatency = latency;
+    
+    // Добавляем в историю
+    this.latencyHistory.push(latency);
+    if (this.latencyHistory.length > this.MAX_LATENCY_HISTORY) {
+      this.latencyHistory.shift();
+    }
+    
+    // Вычисляем среднее значение для стабильности
+    const avgLatency = this.latencyHistory.reduce((a, b) => a + b, 0) / this.latencyHistory.length;
+    
+    // Обновляем качество соединения
+    const newQuality = this.calculateConnectionQuality(avgLatency);
+    
+    if (newQuality !== this.connectionQuality) {
+      this.connectionQuality = newQuality;
+      // Качество соединения изменилось - обновляем awareness
+    }
+  }
+
+  /**
+   * Начало мониторинга latency
+   */
+  private startLatencyMonitoring() {
+    // Проверяем latency каждые 5 секунд
+    this.latencyCheckInterval = setInterval(() => {
+      this.measureLatency();
+    }, 5000);
+    
+    // Первое измерение сразу
+    this.measureLatency();
+  }
+
+  /**
+   * Остановка мониторинга latency
+   */
+  private stopLatencyMonitoring() {
+    if (this.latencyCheckInterval) {
+      clearInterval(this.latencyCheckInterval);
+      this.latencyCheckInterval = null;
+    }
+  }
+
+  /**
+   * Измерение latency (отправляем ping, ждем pong)
+   */
+  private measureLatency() {
+    if (!websocketClient || !websocketClient.isConnected()) {
+      this.updateLatency(-1); // offline
+      return;
+    }
+    
+    this.pingStartTime = Date.now();
+    
+    // Отправляем специальное ping сообщение
+    websocketClient.send({
+      type: 'latency_ping',
+      room_id: this.roomId,
+      timestamp: this.pingStartTime
+    });
+  }
+
+  /**
+   * Обработка latency pong от сервера
+   */
+  private handleLatencyPong(timestamp: number) {
+    if (this.pingStartTime > 0) {
+      const latency = Date.now() - this.pingStartTime;
+      this.updateLatency(latency);
+      this.pingStartTime = 0;
+    }
+  }
+
+  /**
    * Обработка изменений Awareness (курсоры других пользователей)
    */
   private handleAwarenessChange() {
     const states = this.awareness.getStates();
     const localClientId = this.awareness.clientID;
-    
-    // 🔍 ДЕБАГ: Логируем все awareness states
-    console.log('[Awareness Change]', {
-      totalStates: states.size,
-      states: Array.from(states.entries()).map(([clientId, state]) => ({
-        clientId,
-        cursor: state.cursor,
-        isLocal: clientId === localClientId
-      }))
-    });
     
     // Очищаем старые курсоры
     this.remoteCursors.clear();
@@ -597,16 +697,6 @@ export class DiffSyncManager {
         timestamp: Date.now(),
         noteId: this.noteId
       });
-    });
-    
-    // 🔍 ДЕБАГ: Логируем обновленные курсоры
-    console.log('[Awareness] ✅ Обновлено remoteCursors:', {
-      count: this.remoteCursors.size,
-      cursors: Array.from(this.remoteCursors.entries()).map(([userId, cursor]) => ({
-        userId,
-        position: cursor.position,
-        selection: cursor.selection
-      }))
     });
     
     this.onCursorsUpdate(new Map(this.remoteCursors));
@@ -776,7 +866,9 @@ export class DiffSyncManager {
       position,
       selection,
       noteId: this.noteId,
-      timestamp: now
+      timestamp: now,
+      connectionQuality: this.connectionQuality, // Качество соединения
+      latency: Math.round(this.currentLatency)    // RTT в миллисекундах
     });
   }
   
@@ -895,6 +987,9 @@ export class DiffSyncManager {
       clearTimeout(this.pendingAwarenessUpdate);
       this.pendingAwarenessUpdate = null;
     }
+    
+    // Останавливаем мониторинг latency
+    this.stopLatencyMonitoring();
     
     // Сбрасываем сохраненную позицию курсора
     this.lastCursorPosition = -1;
