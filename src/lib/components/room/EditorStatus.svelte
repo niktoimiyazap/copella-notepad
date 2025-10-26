@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { Loader2, Check } from '@lucide/svelte';
+	import { Loader2, Check, Wifi, WifiOff } from '@lucide/svelte';
 	import UserAvatar from '../UserAvatar.svelte';
 	
 	interface EditorUser {
@@ -17,7 +17,6 @@
 	let { syncStatus = 'connected', editingUsers = [] }: Props = $props();
 </script>
 
-{#if editingUsers.length > 0 || syncStatus === 'syncing' || syncStatus === 'saved'}
 <div class="editor-status">
 	<!-- Компактный показ нескольких пользователей -->
 	{#if editingUsers.length > 0}
@@ -53,8 +52,12 @@
 		</div>
 	{/if}
 
-	<!-- Индикатор синхронизации - только при синхронизации или сохранении -->
-	{#if syncStatus === 'syncing'}
+	<!-- Индикатор синхронизации и подключения -->
+	{#if syncStatus === 'connected'}
+		<div class="sync-status connected" title="Подключено">
+			<Wifi size={16} />
+		</div>
+	{:else if syncStatus === 'syncing'}
 		<div class="sync-status syncing" title="Синхронизация...">
 			<Loader2 size={16} class="spinning" />
 		</div>
@@ -62,9 +65,12 @@
 		<div class="sync-status saved" title="Сохранено">
 			<Check size={16} />
 		</div>
+	{:else if syncStatus === 'error'}
+		<div class="sync-status error" title="Ошибка подключения">
+			<WifiOff size={16} />
+		</div>
 	{/if}
 </div>
-{/if}
 
 <style>
 	.editor-status {
@@ -164,6 +170,12 @@
 		transition: all 0.2s ease;
 	}
 
+	.sync-status.connected {
+		color: #34D399;
+		background-color: rgba(52, 211, 153, 0.15);
+		border: 1px solid rgba(52, 211, 153, 0.4);
+	}
+
 	.sync-status.syncing {
 		color: #60A5FA;
 		background-color: rgba(96, 165, 250, 0.15);
@@ -174,6 +186,12 @@
 		color: #34D399;
 		background-color: rgba(52, 211, 153, 0.15);
 		border: 1px solid rgba(52, 211, 153, 0.4);
+	}
+
+	.sync-status.error {
+		color: #EF4444;
+		background-color: rgba(239, 68, 68, 0.15);
+		border: 1px solid rgba(239, 68, 68, 0.4);
 	}
 
 	/* Анимация вращения для иконки синхронизации */
