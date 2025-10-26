@@ -245,10 +245,10 @@
 			return;
 		}
 		
-		// Если пользователь печатает (редактор в фокусе) - НЕ применяем обновление
-		// Это ключевое изменение - мы вообще не трогаем DOM пока пользователь печатает
-		if (isFocused && document.activeElement === editorElement) {
-			// Просто сохраняем pending обновление для применения позже
+		// КРИТИЧНО: НЕ блокируем обновления, если пользователь печатает!
+		// Только откладываем на короткое время если идет активный ввод (isTyping)
+		if (isTyping) {
+			// Сохраняем pending только если идет активная печать прямо сейчас
 			pendingRemoteUpdate = newContent;
 			return;
 		}
@@ -260,21 +260,14 @@
 		requestAnimationFrame(() => {
 			if (!editorElement) return;
 			
-			// Еще раз проверяем что пользователь не начал печатать
-			if (isFocused && document.activeElement === editorElement) {
-				pendingRemoteUpdate = newContent;
-				return;
-			}
-			
-			// КЛЮЧЕВОЕ ИЗМЕНЕНИЕ: Инкрементальное обновление DOM вместо полной перезаписи
-			// Это патчит только изменённые узлы, сохраняя курсор автоматически
-			const hasChanges = applyIncrementalUpdate(editorElement, newContent, isFocused);
+			// КЛЮЧЕВОЕ ИЗМЕНЕНИЕ: Инкрементальное обновление DOM с сохранением курсора
+			// morphDOM автоматически сохраняет курсор, даже если пользователь в фокусе
+			const hasChanges = applyIncrementalUpdate(editorElement, newContent, true);
 			
 			if (hasChanges) {
 				content = newContent;
 				
 				// ВАЖНО: Триггерим событие для обновления курсоров других пользователей
-				// Это нужно чтобы курсоры "просыпались" после изменений в DOM
 				editorElement.dispatchEvent(new CustomEvent('content-updated'));
 			}
 			
@@ -299,10 +292,8 @@
 		
 		// Применяем все отложенные обновления когда пользователь убирает фокус
 		if (pendingRemoteUpdate) {
-			// Небольшая задержка чтобы blur завершился
-			setTimeout(() => {
-				applyRemoteUpdate();
-			}, 50);
+			// Применяем сразу, не ждем
+			applyRemoteUpdate();
 		}
 	}
 
@@ -317,17 +308,15 @@
 			clearTimeout(typingTimeout);
 		}
 		
-		// Сбрасываем флаг isTyping через паузу после последнего символа
-		// Увеличено до 1 секунды чтобы гарантировать что пользователь закончил печатать
+		// Сбрасываем флаг isTyping через короткую паузу после последнего символа
 		typingTimeout = setTimeout(() => {
 			isTyping = false;
 			
-			// Применяем отложенное обновление ТОЛЬКО если пользователь все еще не в фокусе
-			// или точно закончил редактирование
-			if (pendingRemoteUpdate && !isFocused) {
+			// Применяем отложенное обновление если есть
+			if (pendingRemoteUpdate) {
 				applyRemoteUpdate();
 			}
-		}, 1000); // 1 секунда паузы - пользователь точно закончил печатать
+		}, 200); // 200мс - короткая пауза между символами, но достаточная для батчинга
 		
 		// Убираем placeholder при вводе текста
 		if (target.innerHTML === '<br>' || target.innerHTML === '') {
