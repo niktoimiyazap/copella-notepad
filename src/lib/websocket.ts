@@ -63,7 +63,7 @@ class WebSocketClient {
   private pingInterval: ReturnType<typeof setInterval> | null = null;
   private lastPongTime: number = 0;
   private pingTimeout: ReturnType<typeof setTimeout> | null = null;
-  private useBinaryProtocol = false; // TEMPORARY: Отключен до полного деплоя сервера
+  private useBinaryProtocol = true; // ✅ ВКЛЮЧЕН для оптимизации Yjs и awareness
 
   constructor() {
     // Автоматическое переподключение при потере соединения

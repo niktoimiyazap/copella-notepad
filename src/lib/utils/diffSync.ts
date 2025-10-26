@@ -71,6 +71,11 @@ export class DiffSyncManager {
   // Отслеживание последней позиции курсора для предотвращения дублирующих обновлений
   private lastCursorPosition: number = -1;
   private lastCursorSelection: { start: number; end: number } | undefined = undefined;
+  
+  // Throttling для awareness updates
+  private lastAwarenessUpdate: number = 0;
+  private awarenessThrottle: number = 100; // 100ms между обновлениями
+  private pendingAwarenessUpdate: ReturnType<typeof setTimeout> | null = null;
 
   // Цвета для пользователей
   private userColors = new Map<string, string>();
@@ -90,8 +95,8 @@ export class DiffSyncManager {
 
     // Адаптивный throttle для курсора
     // На мобильных: 200ms = 5 обновлений в секунду (достаточно для отображения курсора)
-    // На десктопе: 50ms = 20 обновлений в секунду (плавнее, но не перегружает)
-    this.cursorThrottle = this.isMobile ? 200 : 50;
+    // На десктопе: 100ms = 10 обновлений в секунду (оптимальный баланс между плавностью и производительностью)
+    this.cursorThrottle = this.isMobile ? 200 : 100;
 
     // Создаем батчер для cursor updates (только для мобильных)
     if (this.isMobile) {
@@ -188,8 +193,7 @@ export class DiffSyncManager {
       websocketClient.onMessage('yjs_sync', this.messageHandler);
       websocketClient.onMessage('yjs_update', this.messageHandler);
       websocketClient.onMessage('awareness_update', this.messageHandler);
-      websocketClient.onMessage('cursor_update', this.messageHandler);
-      websocketClient.onMessage('cursor_remove', this.messageHandler);
+      // cursor_update и cursor_remove больше не нужны - awareness уже содержит эту информацию
       websocketClient.onMessage('note_saved', this.messageHandler);
       
       // Обрабатываем переподключение WebSocket
@@ -246,13 +250,7 @@ export class DiffSyncManager {
           this.handleAwarenessUpdate(message.data);
           break;
         
-        case 'cursor_update':
-          this.handleCursorUpdate(message.data);
-          break;
-        
-        case 'cursor_remove':
-          this.handleCursorRemove(message.data);
-          break;
+        // cursor_update и cursor_remove удалены - awareness уже содержит информацию о курсорах
         
         case 'note_saved':
           if (message.data.noteId === this.noteId) {
@@ -384,9 +382,39 @@ export class DiffSyncManager {
   }
   
   /**
-   * Отправка awareness update на сервер
+   * Отправка awareness update на сервер (с throttling)
    */
   private sendAwarenessUpdate() {
+    if (!websocketClient || !this.isActive || !this.isInitialized) return;
+    
+    const now = Date.now();
+    const timeSinceLastUpdate = now - this.lastAwarenessUpdate;
+    
+    // Очищаем отложенное обновление если оно есть
+    if (this.pendingAwarenessUpdate) {
+      clearTimeout(this.pendingAwarenessUpdate);
+      this.pendingAwarenessUpdate = null;
+    }
+    
+    // Если прошло достаточно времени - отправляем сразу
+    if (timeSinceLastUpdate >= this.awarenessThrottle) {
+      this.lastAwarenessUpdate = now;
+      this.doSendAwarenessUpdate();
+    } else {
+      // Иначе откладываем отправку
+      const delay = this.awarenessThrottle - timeSinceLastUpdate;
+      this.pendingAwarenessUpdate = setTimeout(() => {
+        this.lastAwarenessUpdate = Date.now();
+        this.doSendAwarenessUpdate();
+        this.pendingAwarenessUpdate = null;
+      }, delay);
+    }
+  }
+  
+  /**
+   * Фактическая отправка awareness update
+   */
+  private doSendAwarenessUpdate() {
     if (!websocketClient || !this.isActive || !this.isInitialized) return;
     
     // Кодируем локальное состояние awareness
@@ -502,46 +530,7 @@ export class DiffSyncManager {
     this.onCursorsUpdate(new Map(this.remoteCursors));
   }
   
-  /**
-   * Обработка обновления курсора (fallback для старого протокола)
-   */
-  private handleCursorUpdate(data: CursorInfo) {
-    if (data.noteId !== this.noteId) return;
-    
-    // Получаем стабильный цвет для пользователя
-    const color = this.getUserColor(data.userId);
-    
-    this.remoteCursors.set(data.userId, {
-      ...data,
-      color
-    });
-    
-    this.onCursorsUpdate(new Map(this.remoteCursors));
-    
-    // Удаляем старые курсоры (более 5 секунд = пользователь покинул заметку)
-    const now = Date.now();
-    for (const [userId, cursor] of this.remoteCursors.entries()) {
-      if (now - cursor.timestamp > 5000) {
-        this.remoteCursors.delete(userId);
-      }
-    }
-  }
-
-  /**
-   * Обработка удаления курсора (когда пользователь покидает заметку)
-   */
-  private handleCursorRemove(data: { noteId?: string; userId: string }) {
-    // Если указан noteId и это не текущая заметка - игнорируем
-    if (data.noteId && data.noteId !== this.noteId) {
-      return;
-    }
-    
-    // Удаляем курсор пользователя
-    if (this.remoteCursors.has(data.userId)) {
-      this.remoteCursors.delete(data.userId);
-      this.onCursorsUpdate(new Map(this.remoteCursors));
-    }
-  }
+  // handleCursorUpdate и handleCursorRemove удалены - используем только Yjs Awareness
 
 
   /**
@@ -811,6 +800,12 @@ export class DiffSyncManager {
     }
     this.pendingContentUpdate = null;
     
+    // Очищаем отложенное awareness обновление
+    if (this.pendingAwarenessUpdate) {
+      clearTimeout(this.pendingAwarenessUpdate);
+      this.pendingAwarenessUpdate = null;
+    }
+    
     // Сбрасываем сохраненную позицию курсора
     this.lastCursorPosition = -1;
     this.lastCursorSelection = undefined;
@@ -827,8 +822,7 @@ export class DiffSyncManager {
       websocketClient.offMessage('yjs_sync', this.messageHandler);
       websocketClient.offMessage('yjs_update', this.messageHandler);
       websocketClient.offMessage('awareness_update', this.messageHandler);
-      websocketClient.offMessage('cursor_update', this.messageHandler);
-      websocketClient.offMessage('cursor_remove', this.messageHandler);
+      // cursor_update и cursor_remove больше не используются
       websocketClient.offMessage('note_saved', this.messageHandler);
       websocketClient.offMessage('reconnected', this.messageHandler);
     }
