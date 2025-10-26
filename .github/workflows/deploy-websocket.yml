@@ -1,0 +1,43 @@
+name: Deploy WebSocket Server
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'server/**'
+      - 'package.json'
+      - 'package-lock.json'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    name: Deploy to VPS
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+    
+    - name: Deploy to server via SSH
+      uses: appleboy/ssh-action@master
+      with:
+        host: ${{ secrets.VPS_HOST }}
+        username: ${{ secrets.VPS_USERNAME }}
+        key: ${{ secrets.VPS_SSH_KEY }}
+        script: |
+          cd /home/vladikkrivolapovik/copella-notepad
+          
+          echo "📦 Pulling latest changes..."
+          git pull origin main
+          
+          echo "📥 Installing dependencies..."
+          npm install --production
+          
+          echo "🔄 Restarting WebSocket server..."
+          pm2 restart copella-websocket
+          
+          echo "💾 Saving PM2 configuration..."
+          pm2 save
+          
+          echo "✅ Deployment complete!"
+          pm2 list
+
