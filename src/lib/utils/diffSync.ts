@@ -59,6 +59,11 @@ export class DiffSyncManager {
   private pendingContentUpdate: string | null = null;
   private contentUpdateTimeout: ReturnType<typeof setTimeout> | null = null;
   private isMobile: boolean = isMobileDevice();
+  
+  // Батчинг для Yjs updates (группируем несколько изменений в один update)
+  private pendingUpdates: Uint8Array[] = [];
+  private updateBatchTimeout: ReturnType<typeof setTimeout> | null = null;
+  private readonly UPDATE_BATCH_DELAY = 50; // 50ms задержка для батчинга updates
 
   // Защита от зацикливания (флаг обновления)
   private updateInProgress = false;
@@ -119,10 +124,6 @@ export class DiffSyncManager {
     // Инициализируем IndexedDB для offline-first и мгновенной загрузки
     if (typeof window !== 'undefined') {
       this.indexeddbProvider = new IndexeddbPersistence(`copella-note-${this.noteId}`, this.ydoc);
-      
-      this.indexeddbProvider.on('synced', () => {
-        console.log('[YjsSync] IndexedDB synced - content loaded from local cache');
-      });
     }
 
     // Создаем Undo Manager с умными настройками
@@ -198,7 +199,6 @@ export class DiffSyncManager {
       
       // Обрабатываем переподключение WebSocket
       websocketClient.onMessage('reconnected', async () => {
-        console.log('[YjsSync] WebSocket reconnected, resyncing...');
         await this.reconnect();
       });
 
@@ -218,7 +218,6 @@ export class DiffSyncManager {
   public async reconnect() {
     if (!this.isActive) return;
     
-    console.log('[YjsSync] Reconnecting...');
     this.isInitialized = false;
     this.onSyncStatus('syncing');
     
@@ -272,10 +271,7 @@ export class DiffSyncManager {
    * Запрос начальной синхронизации с сервером
    */
   private async requestSync() {
-    if (!websocketClient) {
-      console.error('[YjsSync] WebSocket client not available');
-      return;
-    }
+    if (!websocketClient) return;
     
     // Создаем state vector для запроса отсутствующих updates
     const stateVector = Y.encodeStateVector(this.ydoc);
@@ -299,7 +295,6 @@ export class DiffSyncManager {
     try {
       // Валидация данных
       if (!data.update || !Array.isArray(data.update)) {
-        console.error('[YjsSync] Invalid sync data received');
         this.onSyncStatus('error');
         return;
       }
@@ -317,7 +312,6 @@ export class DiffSyncManager {
       const content = this.ytext.toString();
       this.onContentUpdate(content);
     } catch (error) {
-      console.error('[YjsSync] Error applying sync update:', error);
       // Не выставляем статус error, просто логируем
       // Документ может синхронизироваться через последующие updates
       this.isInitialized = true; // Все равно помечаем как инициализированный
@@ -348,64 +342,79 @@ export class DiffSyncManager {
   }
 
   /**
-   * Отправка update на сервер
+   * Отправка update на сервер с батчингом
    */
   private sendUpdate(update: Uint8Array) {
     if (!websocketClient || !this.isActive) return;
     
     // Не отправляем пустые updates
-    if (!update || update.length === 0) {
-      console.warn('[YjsSync] Ignoring empty update');
-      return;
-    }
+    if (!update || update.length === 0) return;
     
     // КРИТИЧНО: Дополнительная валидация Yjs update
     // Минимальный валидный Yjs update должен быть хотя бы 2 байта
-    if (update.length < 2) {
-      console.warn('[YjsSync] Ignoring too small update (corrupted?):', update.length, 'bytes');
-      return;
+    if (update.length < 2) return;
+    
+    // Добавляем update в очередь для батчинга
+    this.pendingUpdates.push(update);
+    
+    // Отменяем предыдущий таймер батчинга
+    if (this.updateBatchTimeout) {
+      clearTimeout(this.updateBatchTimeout);
     }
     
-    // Логируем для отладки
-    console.log('[YjsSync] Sending update:', update.length, 'bytes');
-    
-    this.isSyncing = true;
-    this.onSyncStatus('syncing');
+    // Устанавливаем новый таймер для отправки батча
+    this.updateBatchTimeout = setTimeout(() => {
+      this.flushUpdates();
+    }, this.UPDATE_BATCH_DELAY);
+  }
+  
+  /**
+   * Отправка накопленных updates одним батчем
+   */
+  private flushUpdates() {
+    if (!websocketClient || !this.isActive || this.pendingUpdates.length === 0) {
+      return;
+    }
     
     try {
-      // Конвертируем Uint8Array в обычный массив для JSON
-      const updateArray = Array.from(update);
+      // Мерджим все накопленные updates в один
+      const mergedUpdate = Y.mergeUpdates(this.pendingUpdates);
       
-      // Финальная проверка перед отправкой
-      if (updateArray.length === 0) {
-        console.warn('[YjsSync] Update array is empty after conversion');
-        this.isSyncing = false;
-        this.onSyncStatus('connected');
-        return;
+      // Очищаем очередь
+      this.pendingUpdates = [];
+      this.updateBatchTimeout = null;
+      
+      // Отправляем объединенный update
+      if (mergedUpdate.length > 0) {
+        this.isSyncing = true;
+        this.onSyncStatus('syncing');
+        
+        const updateArray = Array.from(mergedUpdate);
+        
+        websocketClient.send({
+          type: 'yjs_update',
+          room_id: this.roomId,
+          data: {
+            noteId: this.noteId,
+            update: updateArray
+          }
+        });
+        
+        // Быстро возвращаем статус в connected
+        setTimeout(() => {
+          if (this.isActive) {
+            this.isSyncing = false;
+            this.onSyncStatus('connected');
+          }
+        }, 100);
       }
-      
-      websocketClient.send({
-        type: 'yjs_update',
-        room_id: this.roomId,
-        data: {
-          noteId: this.noteId,
-          update: updateArray
-        }
-      });
     } catch (error) {
-      console.error('[YjsSync] Error sending update:', error);
+      console.error('[YjsSync] Error sending batched update:', error);
+      this.pendingUpdates = [];
+      this.updateBatchTimeout = null;
       this.isSyncing = false;
       this.onSyncStatus('error');
-      return;
     }
-    
-    // Быстро возвращаем статус в connected
-    setTimeout(() => {
-      if (this.isActive) {
-        this.isSyncing = false;
-        this.onSyncStatus('connected');
-      }
-    }, 100);
   }
   
   /**
@@ -450,13 +459,11 @@ export class DiffSyncManager {
       
       // Валидация awareness update перед отправкой
       if (!awarenessUpdate || awarenessUpdate.length === 0) {
-        console.warn('[YjsSync] Empty awareness update, skipping');
         return;
       }
       
       // Awareness update должен содержать данные (минимум 2 байта)
       if (awarenessUpdate.length < 2) {
-        console.warn('[YjsSync] Too small awareness update, skipping');
         return;
       }
       
@@ -498,7 +505,6 @@ export class DiffSyncManager {
       });
     } catch (error: any) {
       // Игнорируем ошибки awareness updates
-      console.warn('[YjsSync] Error applying awareness update:', error.message);
     }
   }
 
@@ -619,8 +625,9 @@ export class DiffSyncManager {
       clearTimeout(this.contentUpdateTimeout);
     }
     
-    // Адаптивная задержка: 0ms для desktop, 16ms для mobile (60fps)
-    const delay = this.isMobile ? 16 : 0;
+    // Увеличенная задержка для лучшего батчинга при быстрой печати
+    // 30ms для desktop (оптимальный баланс), 50ms для mobile
+    const delay = this.isMobile ? 50 : 30;
     
     this.contentUpdateTimeout = setTimeout(() => {
       this.applyContentUpdate();
@@ -825,6 +832,13 @@ export class DiffSyncManager {
   public destroy() {
     this.isActive = false;
     
+    // Отправляем оставшиеся updates перед закрытием
+    if (this.updateBatchTimeout) {
+      clearTimeout(this.updateBatchTimeout);
+      this.updateBatchTimeout = null;
+    }
+    this.flushUpdates();
+    
     // Удаляем локальное состояние awareness (курсор)
     this.awareness.setLocalState(null);
     
@@ -855,6 +869,9 @@ export class DiffSyncManager {
     this.lastCursorPosition = -1;
     this.lastCursorSelection = undefined;
     this.lastCursorUpdate = 0;
+    
+    // Очищаем очередь updates
+    this.pendingUpdates = [];
     
     // Закрываем IndexedDB провайдер
     if (this.indexeddbProvider) {
