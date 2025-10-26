@@ -5,6 +5,7 @@
 	import { EditRoomModal } from '$lib/components/ui/modals';
 	import { goto } from '$app/navigation';
 	import { getUserRooms, createRoom, updateRoom, deleteRoom, type Room, type CreateRoomData, type UpdateRoomData } from '$lib/rooms';
+	import { userActions } from '$lib/stores/user';
 
 	interface RoomData {
 		id?: string;
@@ -21,9 +22,9 @@
 	let isLoading = $state(true);
 	let error = $state('');
 	
-	// Загружаем комнаты при монтировании компонента
+	// Загружаем данные пользователя и комнаты при монтировании
 	onMount(async () => {
-		// Проверяем авторизацию на клиенте (временно, пока SESSION_SECRET не настроен)
+		// Проверяем авторизацию на клиенте
 		const token = localStorage.getItem('session_token');
 		if (!token) {
 			console.log('[Home] No session token, redirecting to login');
@@ -31,8 +32,34 @@
 			return;
 		}
 		
+		// Загружаем данные пользователя
+		await loadUserData(token);
+		
+		// Загружаем комнаты
 		await loadRooms();
 	});
+	
+	async function loadUserData(token: string) {
+		try {
+			const response = await fetch('/api/auth/me', {
+				headers: {
+					'Authorization': `Bearer ${token}`
+				}
+			});
+			
+			if (response.ok) {
+				const data = await response.json();
+				if (data.user) {
+					userActions.setUser(data.user);
+					console.log('[Home] User data loaded:', data.user.username);
+				}
+			} else {
+				console.error('[Home] Failed to load user data');
+			}
+		} catch (error) {
+			console.error('[Home] Error loading user data:', error);
+		}
+	}
 
 	async function loadRooms() {
 		isLoading = true;

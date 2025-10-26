@@ -1,12 +1,11 @@
 <script lang="ts">
 	import Sidebar from '$lib/components/layout/Sidebar.svelte';
-	import SidebarSkeleton from '$lib/components/layout/SidebarSkeleton.svelte';
 	import { Toaster } from 'svelte-sonner';
 	import { UserManagementContainer } from '$lib/api/user-management';
 	import '../app.css';
 	import { page } from '$app/stores';
 	import { onMount, setContext } from 'svelte';
-	import { currentUser, userActions, authState } from '$lib/stores/user';
+	import { currentUser } from '$lib/stores/user';
 
 	let { children, data } = $props();
 	
@@ -27,14 +26,6 @@
 	$effect(() => {
 		isMobile = isMobileDevice;
 	});
-	
-	// Effect to sync store with server data when data.user changes
-	$effect(() => {
-		// Синхронизируем store с серверными данными при каждом изменении
-		if (data.user !== undefined) {
-			userActions.initializeFromServer(data.user);
-		}
-	});
 
 	function toggleLeftSidebar() {
 		isLeftSidebarOpen = !isLeftSidebarOpen;
@@ -52,13 +43,7 @@
 		document.documentElement.style.setProperty('--app-height', `${window.innerHeight}px`);
 	}
 	
-	// Инициализируем пользователя из серверных данных при монтировании
-	// Это происходит один раз и предотвращает "мерцание" UI
 	onMount(() => {
-		// Всегда синхронизируем store с серверными данными при загрузке
-		// Это гарантирует что данные актуальны
-		userActions.initializeFromServer(data.user);
-
 		// Отслеживаем размер окна для определения мобильного устройства
 		windowWidth = window.innerWidth;
 		isMobile = windowWidth <= 768;
@@ -106,26 +91,13 @@
 		};
 	});
 	
-	// Проверяем, загружены ли данные пользователя
-	// Если есть данные с сервера (data.user) или store инициализирован с пользователем - показываем сайдбар
-	// Иначе показываем скелетон
-	const isUserDataLoaded = $derived(
-		!!data.user || ($authState.isInitialized && !!$currentUser)
-	);
-	
-	// Используем данные из data.user или $currentUser (приоритет у store для реактивности)
-	// Это решает проблему с прогрузкой ника и аватарки при загрузке
+	// Используем данные из $currentUser
+	// Данные загружаются асинхронно через API на главной странице
 	const userNickname = $derived(
-		$currentUser ? `@${$currentUser.username}` : 
-		data.user ? `@${data.user.username}` : 
-		'@user'
+		$currentUser ? `@${$currentUser.username}` : '@user'
 	);
 	
-	const userAvatar = $derived(
-		$currentUser?.avatarUrl ?? 
-		data.user?.avatarUrl ?? 
-		null
-	);
+	const userAvatar = $derived($currentUser?.avatarUrl ?? null);
 </script>
 
 <svelte:head>
@@ -135,21 +107,13 @@
 
 <div class="app" class:docs-page={isDocsPage} class:user-management-page={isUserManagementPage} class:auth-page={isAuthPage}>
 	{#if !isDocsPage && !isUserManagementPage && !isAuthPage}
-		{#if isUserDataLoaded}
-			<Sidebar 
-				userNickname={userNickname} 
-				userAvatar={userAvatar}
-				isMini={true}
-				isOpen={isLeftSidebarOpen}
-				onToggle={toggleLeftSidebar}
-			/>
-		{:else}
-			<SidebarSkeleton 
-				isMini={true}
-				isOpen={isLeftSidebarOpen}
-				isMobile={isMobile}
-			/>
-		{/if}
+		<Sidebar 
+			userNickname={userNickname} 
+			userAvatar={userAvatar}
+			isMini={true}
+			isOpen={isLeftSidebarOpen}
+			onToggle={toggleLeftSidebar}
+		/>
 	{/if}
 	
 	<main class="main-content" class:full-width={isDocsPage || isUserManagementPage || isAuthPage}>
