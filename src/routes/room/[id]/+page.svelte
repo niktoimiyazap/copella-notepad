@@ -308,9 +308,12 @@
 	async function handleSaveNoteTitle(newTitle: string) {
 		if (!editingNoteId) return;
 		
+		// Сохраняем noteId локально, чтобы он не обнулился во время async операции
+		const noteIdToUpdate = editingNoteId;
+		
 		try {
 			const { updateNote } = await import('$lib/notes');
-			const { note: updatedNote, error: updateError } = await updateNote(editingNoteId, {
+			const { note: updatedNote, error: updateError } = await updateNote(noteIdToUpdate, {
 				title: newTitle
 			});
 			
@@ -323,7 +326,7 @@
 			if (updatedNote) {
 				// Update note in the list
 				roomData.notes = roomData.notes.map(n => 
-					n.id === editingNoteId ? updatedNote : n
+					n.id === noteIdToUpdate ? updatedNote : n
 				);
 			}
 		} catch (error) {

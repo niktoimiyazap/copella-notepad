@@ -33,8 +33,10 @@
 	function handleSave() {
 		if (newTitle.trim() && newTitle.trim() !== currentTitle) {
 			onSave?.(newTitle.trim());
+		} else {
+			// Закрываем только если название не изменилось
+			onCancel?.();
 		}
-		onCancel?.();
 	}
 
 	function handleCancel() {
