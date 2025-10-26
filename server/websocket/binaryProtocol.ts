@@ -99,9 +99,34 @@ export function decodeBinaryMessage(buffer: Buffer): BinaryMessage {
 
 /**
  * Проверка, является ли сообщение бинарным
+ * Бинарное сообщение должно:
+ * 1. Быть Buffer
+ * 2. Иметь минимум 5 байт (1 байт тип + 4 байта длина метаданных)
+ * 3. Первый байт должен быть валидным типом сообщения (1-255)
  */
 export function isBinaryMessage(data: any): boolean {
-  return Buffer.isBuffer(data);
+  if (!Buffer.isBuffer(data)) {
+    return false;
+  }
+  
+  // Минимальный размер бинарного сообщения: 1 (type) + 4 (metadata length)
+  if (data.length < 5) {
+    return false;
+  }
+  
+  // Проверяем, что первый байт - валидный тип (не ASCII символ)
+  const firstByte = data.readUInt8(0);
+  
+  // ASCII символы '{' и '[' (начало JSON) имеют коды 123 и 91
+  // Наши типы сообщений: 1-9, 255
+  // Если это JSON, первый байт будет ASCII символом (обычно 123 = '{')
+  if (firstByte === 123 || firstByte === 91) {
+    return false;
+  }
+  
+  // Проверяем, что это валидный тип сообщения из нашего протокола
+  const validTypes = [1, 2, 3, 4, 5, 6, 7, 8, 9, 255];
+  return validTypes.includes(firstByte);
 }
 
 /**
