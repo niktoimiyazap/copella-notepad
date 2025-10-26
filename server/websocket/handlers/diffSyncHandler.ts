@@ -84,11 +84,9 @@ export class DiffSyncHandler {
           `copella-room-${note.roomId}-note-${noteId}`, // Та же комната что и у клиентов
           ydoc,
           {
-            // Signaling серверы (те же что на клиенте)
+            // Используем локальный signaling сервер (без внешних зависимостей)
             signaling: [
-              'wss://signaling.yjs.dev',
-              'wss://y-webrtc-signaling-eu.herokuapp.com',
-              'wss://y-webrtc-signaling-us.herokuapp.com'
+              'ws://localhost:4444'  // Локальный signaling на том же сервере
             ],
             // STUN серверы для NAT traversal
             peerOpts: {

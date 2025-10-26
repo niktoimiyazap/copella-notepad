@@ -36,8 +36,8 @@ jobs:
           echo "📥 Installing dependencies..."
           npm install --production
           
-          echo "🔄 Restarting WebSocket server..."
-          pm2 restart copella-websocket
+          echo "🔄 Restarting servers (WebSocket + Signaling)..."
+          pm2 restart ecosystem.config.cjs
           
           echo "💾 Saving PM2 configuration..."
           pm2 save

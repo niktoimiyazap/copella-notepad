@@ -6,8 +6,10 @@
 	"scripts": {
 		"dev": "vite dev",
 		"dev:ws": "tsx server/start-websocket.ts",
-		"dev:all": "concurrently \"npm run dev\" \"npm run dev:ws\"",
+		"dev:signaling": "tsx server/start-signaling.ts",
+		"dev:all": "concurrently \"npm run dev\" \"npm run dev:ws\" \"npm run dev:signaling\"",
 		"start:ws": "node --import tsx server/start-websocket.ts",
+		"start:signaling": "node --import tsx server/start-signaling.ts",
 		"build": "vite build",
 		"preview": "vite preview",
 		"prepare": "svelte-kit sync || echo ''",

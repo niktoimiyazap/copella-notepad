@@ -109,11 +109,9 @@ export class DiffSyncManager {
           this.ydoc,
           {
             awareness: this.awareness,
-            // Signaling серверы для установки P2P соединения
+            // Используем СВОЙ signaling сервер!
             signaling: [
-              'wss://signaling.yjs.dev', // Публичный signaling от Yjs
-              'wss://y-webrtc-signaling-eu.herokuapp.com',
-              'wss://y-webrtc-signaling-us.herokuapp.com'
+              'wss://ws.copella.live:4444'
             ],
             // STUN/TURN серверы для NAT traversal
             peerOpts: {
