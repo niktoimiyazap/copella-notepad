@@ -92,7 +92,8 @@ export function decodeBinaryMessage(buffer: Buffer): BinaryMessage {
     roomId: metadata.roomId,
     data: {
       ...metadata,
-      ...(payload ? { update: payload } : {})
+      // Конвертируем Buffer в массив чисел для совместимости с обработчиками
+      ...(payload ? { update: Array.from(payload) } : {})
     }
   };
 }
