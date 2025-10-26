@@ -23,6 +23,14 @@
 	
 	// Загружаем комнаты при монтировании компонента
 	onMount(async () => {
+		// Проверяем авторизацию на клиенте (временно, пока SESSION_SECRET не настроен)
+		const token = localStorage.getItem('session_token');
+		if (!token) {
+			console.log('[Home] No session token, redirecting to login');
+			goto('/auth/login');
+			return;
+		}
+		
 		await loadRooms();
 	});
 
