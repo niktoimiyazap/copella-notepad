@@ -46,6 +46,11 @@ export class DiffSyncManager {
   private pendingContentUpdate: string | null = null;
   private contentUpdateTimeout: ReturnType<typeof setTimeout> | null = null;
 
+  // Дедупликация для защиты от зацикливания
+  private lastSentContentHash: string = '';
+  private lastAppliedRemoteHash: string = '';
+  private updateInProgress = false;
+
   // Цвета для пользователей
   private userColors = new Map<string, string>();
   private colorPalette = [
@@ -87,6 +92,18 @@ export class DiffSyncManager {
         
         // Применяем только удаленные изменения
         const content = this.ytext.toString();
+        const contentHash = this.hashContent(content);
+        
+        // КРИТИЧНО: Проверяем хеш чтобы не применять одинаковый контент повторно
+        if (contentHash === this.lastAppliedRemoteHash) {
+          console.log('[YjsSync] Remote content has same hash, skipping to prevent loop');
+          return;
+        }
+        
+        // Сохраняем хеш примененного remote контента
+        this.lastAppliedRemoteHash = contentHash;
+        
+        console.log('[YjsSync] Applying remote update, hash:', contentHash);
         this.onContentUpdate(content);
       }
     });
@@ -305,6 +322,19 @@ export class DiffSyncManager {
   }
 
   /**
+   * Быстрое хеширование контента для дедупликации
+   */
+  private hashContent(content: string): string {
+    let hash = 0;
+    for (let i = 0; i < content.length; i++) {
+      const char = content.charCodeAt(i);
+      hash = ((hash << 5) - hash) + char;
+      hash = hash & hash;
+    }
+    return `${hash}_${content.length}`;
+  }
+
+  /**
    * Получение стабильного цвета для пользователя на основе userId
    */
   private getUserColor(userId: string): string {
@@ -420,13 +450,29 @@ export class DiffSyncManager {
   private applyContentUpdate() {
     if (!this.pendingContentUpdate || !this.isActive || !this.isInitialized) return;
     
+    // Защита от зацикливания - не обрабатываем если уже в процессе
+    if (this.updateInProgress) {
+      console.warn('[YjsSync] Update already in progress, skipping to prevent loop');
+      return;
+    }
+    
     const newContent = this.pendingContentUpdate;
     this.pendingContentUpdate = null;
     
     const currentContent = this.ytext.toString();
     
     // Игнорируем если контент не изменился
-    if (newContent === currentContent) return;
+    if (newContent === currentContent) {
+      console.log('[YjsSync] Content identical, skipping');
+      return;
+    }
+    
+    // КРИТИЧНО: Проверяем хеш чтобы не отправлять одинаковые обновления
+    const newHash = this.hashContent(newContent);
+    if (newHash === this.lastSentContentHash) {
+      console.log('[YjsSync] Same content hash, skipping duplicate update');
+      return;
+    }
     
     // ВАЖНО: Проверяем что изменение не слишком большое
     // Если изменение > 50% документа, возможно это конфликт - игнорируем
@@ -450,22 +496,35 @@ export class DiffSyncManager {
       return;
     }
     
-    // Применяем изменения только к изменённой части
-    // transact группирует операции для оптимальной производительности
-    this.ydoc.transact(() => {
-      // Сначала удаляем (если нужно)
-      if (deleteLen > 0) {
-        this.ytext.delete(deleteStart, deleteLen);
-      }
-      
-      // Потом вставляем (если есть что вставить)
-      if (insertText.length > 0) {
-        this.ytext.insert(deleteStart, insertText);
-      }
-    }, 'local'); // Указываем origin 'local' для отслеживания в UndoManager
+    // Устанавливаем флаг что обновление в процессе
+    this.updateInProgress = true;
     
-    // Yjs автоматически генерирует update event, который отправится на сервер
-    // через обработчик ydoc.on('update') в конструкторе
+    try {
+      // Применяем изменения только к изменённой части
+      // transact группирует операции для оптимальной производительности
+      this.ydoc.transact(() => {
+        // Сначала удаляем (если нужно)
+        if (deleteLen > 0) {
+          this.ytext.delete(deleteStart, deleteLen);
+        }
+        
+        // Потом вставляем (если есть что вставить)
+        if (insertText.length > 0) {
+          this.ytext.insert(deleteStart, insertText);
+        }
+      }, 'local'); // Указываем origin 'local' для отслеживания в UndoManager
+      
+      // Сохраняем хеш отправленного контента для дедупликации
+      this.lastSentContentHash = newHash;
+      
+      console.log('[YjsSync] Applied update, new hash:', newHash);
+      
+      // Yjs автоматически генерирует update event, который отправится на сервер
+      // через обработчик ydoc.on('update') в конструкторе
+    } finally {
+      // Снимаем флаг обновления
+      this.updateInProgress = false;
+    }
   }
 
 
