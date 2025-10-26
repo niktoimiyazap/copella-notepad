@@ -154,6 +154,12 @@ export class DiffSyncManager {
       websocketClient.onMessage('cursor_update', this.messageHandler);
       websocketClient.onMessage('cursor_remove', this.messageHandler);
       websocketClient.onMessage('note_saved', this.messageHandler);
+      
+      // Обрабатываем переподключение WebSocket
+      websocketClient.onMessage('reconnected', async () => {
+        console.log('[YjsSync] WebSocket reconnected, resyncing...');
+        await this.reconnect();
+      });
 
       // Запрашиваем начальное состояние документа
       await this.requestSync();
@@ -161,6 +167,26 @@ export class DiffSyncManager {
       this.onSyncStatus('connected');
     } catch (error) {
       console.error('[YjsSync] Initialization error:', error);
+      this.onSyncStatus('error');
+    }
+  }
+  
+  /**
+   * Переподключение после потери соединения
+   */
+  public async reconnect() {
+    if (!this.isActive) return;
+    
+    console.log('[YjsSync] Reconnecting...');
+    this.isInitialized = false;
+    this.onSyncStatus('syncing');
+    
+    try {
+      // Запрашиваем полную синхронизацию заново
+      await this.requestSync();
+      this.onSyncStatus('connected');
+    } catch (error) {
+      console.error('[YjsSync] Reconnect error:', error);
       this.onSyncStatus('error');
     }
   }
@@ -639,6 +665,7 @@ export class DiffSyncManager {
       websocketClient.offMessage('cursor_update', this.messageHandler);
       websocketClient.offMessage('cursor_remove', this.messageHandler);
       websocketClient.offMessage('note_saved', this.messageHandler);
+      websocketClient.offMessage('reconnected', this.messageHandler);
     }
     
     // Очищаем Undo Manager

@@ -33,7 +33,7 @@ interface WebSocketMessage {
         'user_online' | 'user_offline' | 'participant_update' | 
         'invite_created' | 'invite_accepted' | 'invite_declined' | 'invite_revoked' | 
         'approval_request' | 'approval_response' | 'room_joined' | 'error' | 'pong' |
-        'note_content_update' | 'note_saved' | 'cursor_update';
+        'note_content_update' | 'note_saved' | 'cursor_update' | 'reconnected';
   room_id?: string;
   data?: any;
   timestamp?: Date;
@@ -61,8 +61,26 @@ class WebSocketClient {
   constructor() {
     // Автоматическое переподключение при потере соединения
     if (browser && typeof window !== 'undefined') {
-      window.addEventListener('beforeunload', () => {
-        this.forceDisconnect();
+      // НЕ закрываем соединение на beforeunload - пусть браузер сам закроет
+      // Это позволит переподключиться при возврате
+      
+      // Обработка visibility change (возвращение на страницу)
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') {
+          // Пользователь вернулся на страницу
+          console.log('[WebSocket] Page became visible, checking connection...');
+          this.checkAndReconnect();
+        }
+      });
+      
+      // Обработка online/offline событий браузера
+      window.addEventListener('online', () => {
+        console.log('[WebSocket] Network online, reconnecting...');
+        this.checkAndReconnect();
+      });
+      
+      window.addEventListener('offline', () => {
+        console.log('[WebSocket] Network offline');
       });
       
       // Слушаем обновление токена Supabase и переподключаемся
@@ -75,6 +93,23 @@ class WebSocketClient {
           this.forceDisconnect();
         }
       });
+    }
+  }
+  
+  /**
+   * Проверка и переподключение если нужно
+   */
+  private checkAndReconnect() {
+    // Если есть room ID но нет соединения или room не joined - переподключаемся
+    if (this.currentRoomId && (!this.isConnected() || !this.isRoomJoined)) {
+      console.log('[WebSocket] Reconnecting to room:', this.currentRoomId);
+      const roomId = this.currentRoomId;
+      
+      // Сбрасываем счетчик попыток чтобы дать больше шансов
+      this.reconnectAttempts = 0;
+      
+      // Переподключаемся
+      this.connect(roomId);
     }
   }
   
@@ -254,10 +289,17 @@ class WebSocketClient {
 
         this.ws.onopen = () => {
           this.isConnecting = false;
+          const wasReconnecting = this.reconnectAttempts > 0;
           this.reconnectAttempts = 0;
           
           // Присоединяемся к комнате с повторными попытками
           this.joinRoomWithRetry(roomId);
+          
+          // Если это было переподключение, уведомляем подписчиков
+          if (wasReconnecting) {
+            console.log('[WebSocket] Reconnected successfully');
+            this.handleMessage({ type: 'reconnected' as any, room_id: roomId });
+          }
         };
 
         this.ws.onmessage = (event) => {
