@@ -73,8 +73,19 @@ export class DiffSyncManager {
     });
 
     // Подписываемся на изменения в Yjs документе
-    this.ytext.observe(() => {
+    // ВАЖНО: вызываем callback только для удаленных изменений (origin !== 'local')
+    this.ytext.observe((event) => {
       if (this.isInitialized) {
+        // Проверяем откуда пришло изменение
+        const transaction = event.transaction;
+        const origin = transaction.origin;
+        
+        // Игнорируем локальные изменения - они уже в редакторе
+        if (origin === 'local') {
+          return;
+        }
+        
+        // Применяем только удаленные изменения
         const content = this.ytext.toString();
         this.onContentUpdate(content);
       }

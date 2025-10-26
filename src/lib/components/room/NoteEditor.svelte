@@ -81,7 +81,7 @@
 	// Throttle для предотвращения слишком частых обновлений при быстрой печати
 	let lastInputTime = 0;
 	let inputThrottleDelay = 16; // ~60 FPS, достаточно для плавности
-	
+
 	// Флаг для отслеживания активного ввода текста
 	let isTyping = false;
 	let typingTimeout: ReturnType<typeof setTimeout> | null = null;
@@ -237,21 +237,19 @@
 		// Обновляем время последнего обновления
 		lastRemoteUpdateTime = Date.now();
 		
-		// Если пользователь печатает (редактор в фокусе) - сохраняем позицию курсора
-		let savedCursorPosition: number | null = null;
+		const currentContent = editorElement.innerHTML;
+		
+		// Если контент идентичен, ничего не делаем
+		if (currentContent === newContent) {
+			return;
+		}
+		
+		// Если пользователь печатает (редактор в фокусе) - НЕ применяем обновление
+		// Это ключевое изменение - мы вообще не трогаем DOM пока пользователь печатает
 		if (isFocused && document.activeElement === editorElement) {
-			const selection = window.getSelection();
-			if (selection && selection.rangeCount > 0) {
-				try {
-					const range = selection.getRangeAt(0);
-					const preRange = document.createRange();
-					preRange.selectNodeContents(editorElement);
-					preRange.setEnd(range.endContainer, range.endOffset);
-					savedCursorPosition = preRange.toString().length;
-				} catch (error) {
-					// Игнорируем ошибки
-				}
-			}
+			// Просто сохраняем pending обновление для применения позже
+			pendingRemoteUpdate = newContent;
+			return;
 		}
 		
 		// Сохраняем позицию скролла
@@ -261,23 +259,17 @@
 		requestAnimationFrame(() => {
 			if (!editorElement) return;
 			
+			// Еще раз проверяем что пользователь не начал печатать
+			if (isFocused && document.activeElement === editorElement) {
+				pendingRemoteUpdate = newContent;
+				return;
+			}
+			
 			editorElement.innerHTML = newContent;
 			content = newContent;
 			
 			// Восстанавливаем скролл
 			editorElement.scrollTop = scrollTop;
-			
-			// Восстанавливаем курсор если был сохранен
-			if (savedCursorPosition !== null) {
-				// Используем микрозадачу для гарантии что DOM обновился
-				queueMicrotask(() => {
-					try {
-						restoreCursorPosition(editorElement!, savedCursorPosition);
-					} catch (error) {
-						// Игнорируем ошибки восстановления курсора
-					}
-				});
-			}
 		});
 	}
 
@@ -287,11 +279,20 @@
 
 	function handleBlur() {
 		isFocused = false;
+		isTyping = false;
 		
 		// Отправляем "пустой" курсор при потере фокуса
 		if (diffSyncManager) {
 			// Отправляем специальное значение -1 чтобы убрать курсор
 			diffSyncManager.updateCursor(-1);
+		}
+		
+		// Применяем все отложенные обновления когда пользователь убирает фокус
+		if (pendingRemoteUpdate) {
+			// Небольшая задержка чтобы blur завершился
+			setTimeout(() => {
+				applyRemoteUpdate();
+			}, 50);
 		}
 	}
 
@@ -306,15 +307,17 @@
 			clearTimeout(typingTimeout);
 		}
 		
-		// Сбрасываем флаг isTyping через короткую паузу после последнего символа
+		// Сбрасываем флаг isTyping через паузу после последнего символа
+		// Увеличено до 1 секунды чтобы гарантировать что пользователь закончил печатать
 		typingTimeout = setTimeout(() => {
 			isTyping = false;
 			
-			// Применяем отложенное обновление если есть
-			if (pendingRemoteUpdate) {
+			// Применяем отложенное обновление ТОЛЬКО если пользователь все еще не в фокусе
+			// или точно закончил редактирование
+			if (pendingRemoteUpdate && !isFocused) {
 				applyRemoteUpdate();
 			}
-		}, 300); // 300мс паузы после печати считается окончанием ввода
+		}, 1000); // 1 секунда паузы - пользователь точно закончил печатать
 		
 		// Убираем placeholder при вводе текста
 		if (target.innerHTML === '<br>' || target.innerHTML === '') {
