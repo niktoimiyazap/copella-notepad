@@ -127,6 +127,21 @@ export async function authenticateToken(token: string): Promise<AuthResult> {
  */
 export async function checkRoomAccess(userId: string, roomId: string): Promise<boolean> {
   try {
+    // Сначала проверяем, является ли пользователь создателем комнаты
+    const room = await prisma.room.findFirst({
+      where: {
+        id: roomId,
+        createdBy: userId
+      }
+    });
+
+    // Если пользователь - создатель, он всегда имеет доступ
+    if (room) {
+      console.log(`[checkRoomAccess] User ${userId} is the creator of room ${roomId}`);
+      return true;
+    }
+
+    // Если не создатель - проверяем таблицу участников
     const participant = await prisma.roomParticipant.findFirst({
       where: {
         userId,
@@ -134,7 +149,9 @@ export async function checkRoomAccess(userId: string, roomId: string): Promise<b
       }
     });
 
-    return !!participant;
+    const hasAccess = !!participant;
+    console.log(`[checkRoomAccess] User ${userId} ${hasAccess ? 'has' : 'does not have'} access to room ${roomId} (as participant)`);
+    return hasAccess;
   } catch (error) {
     console.error('[checkRoomAccess] Error:', error);
     return false;
