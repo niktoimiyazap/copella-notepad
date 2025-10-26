@@ -19,17 +19,39 @@
 
 {#if editingUsers.length > 0 || syncStatus === 'syncing' || syncStatus === 'saved'}
 <div class="editor-status">
-	<!-- Уведомления о редактировании для каждого пользователя -->
-	{#each editingUsers as user (user.userId)}
+	<!-- Компактный показ нескольких пользователей -->
+	{#if editingUsers.length > 0}
 		<div class="editing-notification">
-			<UserAvatar 
-				username={user.username}
-				avatarUrl={user.avatarUrl}
-				size="small"
-			/>
-			<span class="editing-text">{user.username || 'Аноним'} редактирует</span>
+			<!-- Показываем аватары всех редактирующих -->
+			<div class="editing-avatars">
+				{#each editingUsers.slice(0, 3) as user (user.userId)}
+					<div class="avatar-wrapper" style="--user-color: {user.color}">
+						<UserAvatar 
+							username={user.username}
+							avatarUrl={user.avatarUrl}
+							size="small"
+						/>
+					</div>
+				{/each}
+				{#if editingUsers.length > 3}
+					<div class="more-users">
+						+{editingUsers.length - 3}
+					</div>
+				{/if}
+			</div>
+			
+			<!-- Текст с количеством -->
+			<span class="editing-text">
+				{#if editingUsers.length === 1}
+					{editingUsers[0].username || 'Пользователь'} редактирует
+				{:else if editingUsers.length === 2}
+					{editingUsers[0].username || 'Пользователь'} и {editingUsers[1].username || 'пользователь'} редактируют
+				{:else}
+					{editingUsers.length} пользователей редактируют
+				{/if}
+			</span>
 		</div>
-	{/each}
+	{/if}
 
 	<!-- Индикатор синхронизации - только при синхронизации или сохранении -->
 	{#if syncStatus === 'syncing'}
@@ -64,12 +86,13 @@
 	.editing-notification {
 		display: flex;
 		align-items: center;
-		gap: 8px;
-		padding: 6px 12px;
+		gap: 10px;
+		padding: 6px 14px;
 		background-color: rgba(254, 177, 255, 0.15);
 		border: 1px solid rgba(254, 177, 255, 0.4);
-		border-radius: 10px;
+		border-radius: 12px;
 		animation: fadeIn 0.3s ease;
+		backdrop-filter: blur(10px);
 	}
 
 	@keyframes fadeIn {
@@ -83,6 +106,46 @@
 		}
 	}
 
+	/* Контейнер для аватаров */
+	.editing-avatars {
+		display: flex;
+		align-items: center;
+		gap: -4px; /* Отрицательный gap для наложения */
+	}
+
+	.avatar-wrapper {
+		position: relative;
+		border: 2px solid var(--user-color, #FEB1FF);
+		border-radius: 50%;
+		background-color: #1A1A1A;
+		transition: transform 0.2s ease;
+	}
+
+	.avatar-wrapper:not(:first-child) {
+		margin-left: -8px; /* Наложение аватаров */
+	}
+
+	.avatar-wrapper:hover {
+		transform: translateY(-2px) scale(1.05);
+		z-index: 10;
+	}
+
+	/* Индикатор +N пользователей */
+	.more-users {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		width: 28px;
+		height: 28px;
+		margin-left: -8px;
+		background: linear-gradient(135deg, rgba(254, 177, 255, 0.3), rgba(254, 177, 255, 0.5));
+		border: 2px solid rgba(254, 177, 255, 0.6);
+		border-radius: 50%;
+		font-size: 11px;
+		font-weight: 600;
+		color: #FEB1FF;
+		backdrop-filter: blur(10px);
+	}
 
 	.editing-text {
 		font-size: 13px;
@@ -136,8 +199,19 @@
 		}
 		
 		.editing-notification {
-			padding: 5px 10px;
-			gap: 6px;
+			padding: 5px 12px;
+			gap: 8px;
+		}
+		
+		.avatar-wrapper:not(:first-child) {
+			margin-left: -6px;
+		}
+
+		.more-users {
+			width: 24px;
+			height: 24px;
+			margin-left: -6px;
+			font-size: 10px;
 		}
 		
 		.editing-text {
@@ -157,8 +231,24 @@
 		}
 		
 		.editing-notification {
-			padding: 4px 8px;
-			gap: 4px;
+			padding: 4px 10px;
+			gap: 6px;
+		}
+
+		.avatar-wrapper {
+			border-width: 1.5px;
+		}
+		
+		.avatar-wrapper:not(:first-child) {
+			margin-left: -4px;
+		}
+
+		.more-users {
+			width: 22px;
+			height: 22px;
+			margin-left: -4px;
+			font-size: 9px;
+			border-width: 1.5px;
 		}
 		
 		.editing-text {
