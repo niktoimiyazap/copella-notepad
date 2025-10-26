@@ -42,6 +42,10 @@ export class DiffSyncManager {
   // WebSocket
   private messageHandler: ((message: any) => void) | null = null;
 
+  // Батчинг для обновлений контента
+  private pendingContentUpdate: string | null = null;
+  private contentUpdateTimeout: ReturnType<typeof setTimeout> | null = null;
+
   // Цвета для пользователей
   private userColors = new Map<string, string>();
   private colorPalette = [
@@ -225,12 +229,9 @@ export class DiffSyncManager {
   private handleYjsUpdate(data: { noteId: string; update: number[] }) {
     if (data.noteId !== this.noteId) return;
     
-    console.log('[YjsSync] Received update for note:', data.noteId, 'size:', data.update?.length);
-    
     try {
       // Валидация данных
       if (!data.update || !Array.isArray(data.update) || data.update.length === 0) {
-        console.warn('[YjsSync] Received empty or invalid update');
         return;
       }
       
@@ -239,12 +240,9 @@ export class DiffSyncManager {
       
       // Применяем update к документу (origin 'server' чтобы не отправлять обратно)
       Y.applyUpdate(this.ydoc, update, 'server');
-      
-      console.log('[YjsSync] Update applied successfully, new content length:', this.ytext.toString().length);
     } catch (error: any) {
       // Yjs может выбросить ошибку если update уже применен или некорректен
-      // Это не критично - просто логируем предупреждение
-      console.warn('[YjsSync] Could not apply update (might be duplicate):', error.message);
+      // Это не критично - игнорируем
     }
   }
 
@@ -375,6 +373,29 @@ export class DiffSyncManager {
   public updateContent(newContent: string) {
     if (!this.isActive || !this.isInitialized) return;
     
+    // Сохраняем pending обновление
+    this.pendingContentUpdate = newContent;
+    
+    // Отменяем предыдущий таймер
+    if (this.contentUpdateTimeout) {
+      clearTimeout(this.contentUpdateTimeout);
+    }
+    
+    // Применяем с небольшой задержкой для батчинга быстрых изменений
+    this.contentUpdateTimeout = setTimeout(() => {
+      this.applyContentUpdate();
+    }, 50); // 50ms батчинг - быстро но группирует несколько символов
+  }
+
+  /**
+   * Применение накопленных изменений контента
+   */
+  private applyContentUpdate() {
+    if (!this.pendingContentUpdate || !this.isActive || !this.isInitialized) return;
+    
+    const newContent = this.pendingContentUpdate;
+    this.pendingContentUpdate = null;
+    
     const currentContent = this.ytext.toString();
     
     // Игнорируем если контент не изменился
@@ -500,6 +521,13 @@ export class DiffSyncManager {
    */
   public destroy() {
     this.isActive = false;
+    
+    // Очищаем pending обновления
+    if (this.contentUpdateTimeout) {
+      clearTimeout(this.contentUpdateTimeout);
+      this.contentUpdateTimeout = null;
+    }
+    this.pendingContentUpdate = null;
     
     // Отписываемся от WebSocket сообщений
     if (websocketClient && this.messageHandler) {

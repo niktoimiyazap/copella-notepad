@@ -103,19 +103,15 @@
 		
 		// Проверяем изменился ли ID заметки
 		if (currentNoteId && roomId && currentNoteId !== lastSyncManagerNoteId) {
-			console.log('[Editor] Switching to note:', currentNoteId);
-			
 			// Обновляем последний ID
 			lastSyncManagerNoteId = currentNoteId;
 			
 			// Очищаем старый менеджер
 			if (diffSyncManager) {
-				console.log('[Editor] Destroying old DiffSyncManager');
 				diffSyncManager.destroy();
 			}
 
 			// Создаем новый менеджер для текущей заметки
-			console.log('[Editor] Creating new DiffSyncManager for note:', currentNoteId);
 			diffSyncManager = new DiffSyncManager({
 				noteId: currentNoteId,
 				roomId: roomId,
@@ -128,8 +124,6 @@
 					if (currentContent === newContent) {
 						return;
 					}
-					
-					console.log('[Editor] Applying remote update, length:', newContent.length);
 					
 					// Сохраняем позицию скролла
 					const scrollTop = editorElement.scrollTop;
@@ -565,8 +559,8 @@
 		if (immediate) {
 			doUpdate();
 		} else {
-			// Увеличена задержка с 100ms до 300ms для снижения нагрузки и лагов
-			cursorUpdateTimeout = setTimeout(doUpdate, 300);
+			// Минимальная задержка для батчинга, но не слишком большая чтобы не лагало
+			cursorUpdateTimeout = setTimeout(doUpdate, 150);
 		}
 	}
 
