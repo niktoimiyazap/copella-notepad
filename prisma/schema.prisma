@@ -57,12 +57,22 @@ model Room {
   invites      RoomInvite[]
 }
 
+// Enum для ролей участников комнаты
+enum RoomRole {
+  creator
+  owner
+  admin
+  moderator
+  user
+  participant
+}
+
 // Модель участника комнаты
 model RoomParticipant {
   id        String   @id @default(cuid())
   roomId    String
   userId    String
-  role      String   @default("participant") // "creator", "admin", "participant"
+  role      RoomRole @default(participant)
   joinedAt  DateTime @default(now())
   lastSeen  DateTime @default(now())
   isOnline  Boolean  @default(false)
