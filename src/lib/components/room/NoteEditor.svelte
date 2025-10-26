@@ -155,10 +155,6 @@
 					// Просто обновляем локальное состояние
 					remoteCursors = cursors;
 					
-					// Логирование для отладки
-					console.log('[NoteEditor] Cursors updated, count:', cursors.size, 
-						'users:', Array.from(cursors.values()).map(c => c.username || c.userId));
-					
 					// Обновляем статус редактирования с дебоунсингом
 					if (editingStatusTimeout) {
 						clearTimeout(editingStatusTimeout);
@@ -264,16 +260,7 @@
 			return;
 		}
 		
-		// Защита от дублирования: проверяем разумность изменения
-		const currentLength = currentContent.length;
-		const newLength = newContent.length;
-		const changeRatio = Math.abs(newLength - currentLength) / Math.max(currentLength, 1);
-		
-		// Если изменение > 80% документа и документ не маленький, это подозрительно
-		if (currentLength > 50 && changeRatio > 0.8) {
-			console.warn('[NoteEditor] Suspicious large change detected, possible duplication. Skipping.');
-			return;
-		}
+		// Убрана проверка на "большое изменение" - Yjs сам управляет конфликтами
 		
 		// Сохраняем позицию скролла
 		const scrollTop = editorElement.scrollTop;

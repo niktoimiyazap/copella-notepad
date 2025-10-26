@@ -95,15 +95,11 @@ export class DiffSyncManager {
         const contentHash = this.hashContent(content);
         
         // КРИТИЧНО: Проверяем хеш чтобы не применять одинаковый контент повторно
-        if (contentHash === this.lastAppliedRemoteHash) {
-          console.log('[YjsSync] Remote content has same hash, skipping to prevent loop');
-          return;
-        }
+        if (contentHash === this.lastAppliedRemoteHash) return;
         
         // Сохраняем хеш примененного remote контента
         this.lastAppliedRemoteHash = contentHash;
         
-        console.log('[YjsSync] Applying remote update, hash:', contentHash);
         this.onContentUpdate(content);
       }
     });
@@ -349,18 +345,7 @@ export class DiffSyncManager {
    * Обработка обновления курсора
    */
   private handleCursorUpdate(data: CursorInfo) {
-    console.log('[DiffSync] Cursor update received:', {
-      userId: data.userId,
-      username: data.username,
-      noteId: data.noteId,
-      thisNoteId: this.noteId,
-      position: data.position
-    });
-    
-    if (data.noteId !== this.noteId) {
-      console.log('[DiffSync] Cursor ignored - wrong noteId');
-      return;
-    }
+    if (data.noteId !== this.noteId) return;
     
     // Получаем стабильный цвет для пользователя
     const color = this.getUserColor(data.userId);
@@ -369,8 +354,6 @@ export class DiffSyncManager {
       ...data,
       color
     });
-    
-    console.log('[DiffSync] Remote cursors now:', this.remoteCursors.size, 'cursors');
     
     this.onCursorsUpdate(new Map(this.remoteCursors));
     
@@ -437,11 +420,11 @@ export class DiffSyncManager {
       clearTimeout(this.contentUpdateTimeout);
     }
     
-    // Применяем немедленно без задержки для real-time синхронизации
-    // 0ms = instant updates, максимально быстрая синхронизация
+    // Минимальный батчинг для группировки быстрых изменений
+    // 8ms = оптимальный баланс между скоростью и производительностью
     this.contentUpdateTimeout = setTimeout(() => {
       this.applyContentUpdate();
-    }, 0); // Instant sync - нет батчинга
+    }, 8);
   }
 
   /**
@@ -451,10 +434,7 @@ export class DiffSyncManager {
     if (!this.pendingContentUpdate || !this.isActive || !this.isInitialized) return;
     
     // Защита от зацикливания - не обрабатываем если уже в процессе
-    if (this.updateInProgress) {
-      console.warn('[YjsSync] Update already in progress, skipping to prevent loop');
-      return;
-    }
+    if (this.updateInProgress) return;
     
     const newContent = this.pendingContentUpdate;
     this.pendingContentUpdate = null;
@@ -462,30 +442,14 @@ export class DiffSyncManager {
     const currentContent = this.ytext.toString();
     
     // Игнорируем если контент не изменился
-    if (newContent === currentContent) {
-      console.log('[YjsSync] Content identical, skipping');
-      return;
-    }
+    if (newContent === currentContent) return;
     
     // КРИТИЧНО: Проверяем хеш чтобы не отправлять одинаковые обновления
     const newHash = this.hashContent(newContent);
-    if (newHash === this.lastSentContentHash) {
-      console.log('[YjsSync] Same content hash, skipping duplicate update');
-      return;
-    }
+    if (newHash === this.lastSentContentHash) return;
     
-    // ВАЖНО: Проверяем что изменение не слишком большое
-    // НО разрешаем полное удаление (newContent пустой или почти пустой)
-    const changeSize = Math.abs(newContent.length - currentContent.length);
-    const isDeletion = newContent.length < 10; // Полное удаление или почти полное
-    if (!isDeletion && currentContent.length > 100 && changeSize > currentContent.length * 0.5) {
-      console.warn('[YjsSync] Large change detected, possible conflict. Skipping to avoid duplication.');
-      return;
-    }
-    
-    if (isDeletion && currentContent.length > 0) {
-      console.log('[YjsSync] Full deletion detected, allowing');
-    }
+    // Убрана проверка на "большое изменение" - она блокировала нормальные обновления
+    // Yjs сам обеспечивает правильную синхронизацию через CRDT
     
     // Вычисляем умный diff: находим общий префикс и суффикс
     const prefixLen = this.commonPrefixLength(currentContent, newContent);
@@ -521,8 +485,6 @@ export class DiffSyncManager {
       
       // Сохраняем хеш отправленного контента для дедупликации
       this.lastSentContentHash = newHash;
-      
-      console.log('[YjsSync] Applied update, new hash:', newHash);
       
       // Yjs автоматически генерирует update event, который отправится на сервер
       // через обработчик ydoc.on('update') в конструкторе
