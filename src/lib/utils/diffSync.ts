@@ -319,7 +319,18 @@ export class DiffSyncManager {
    * Обработка обновления курсора
    */
   private handleCursorUpdate(data: CursorInfo) {
-    if (data.noteId !== this.noteId) return;
+    console.log('[DiffSync] Cursor update received:', {
+      userId: data.userId,
+      username: data.username,
+      noteId: data.noteId,
+      thisNoteId: this.noteId,
+      position: data.position
+    });
+    
+    if (data.noteId !== this.noteId) {
+      console.log('[DiffSync] Cursor ignored - wrong noteId');
+      return;
+    }
     
     // Получаем стабильный цвет для пользователя
     const color = this.getUserColor(data.userId);
@@ -328,6 +339,8 @@ export class DiffSyncManager {
       ...data,
       color
     });
+    
+    console.log('[DiffSync] Remote cursors now:', this.remoteCursors.size, 'cursors');
     
     this.onCursorsUpdate(new Map(this.remoteCursors));
     

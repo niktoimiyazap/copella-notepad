@@ -168,16 +168,13 @@
 					applyRemoteContentUpdate(newContent);
 				},
 				onCursorsUpdate: (cursors) => {
-					// КРИТИЧНО: Фильтруем курсоры только для ТЕКУЩЕЙ заметки
-					const filteredCursors = new Map<string, CursorInfo>();
-					for (const [userId, cursor] of cursors.entries()) {
-						// Показываем курсор только если он для текущей заметки
-						if (cursor.noteId === currentNoteId) {
-							filteredCursors.set(userId, cursor);
-						}
-					}
+					// DiffSyncManager уже отфильтровал курсоры по noteId
+					// Просто обновляем локальное состояние
+					remoteCursors = cursors;
 					
-					remoteCursors = filteredCursors;
+					// Логирование для отладки
+					console.log('[NoteEditor] Cursors updated, count:', cursors.size, 
+						'users:', Array.from(cursors.values()).map(c => c.username || c.userId));
 					
 					// Обновляем статус редактирования с дебоунсингом
 					if (editingStatusTimeout) {
@@ -185,7 +182,7 @@
 					}
 					
 					// Показываем статус только если есть активные курсоры
-					if (filteredCursors.size > 0) {
+					if (cursors.size > 0) {
 						isBeingEdited = true;
 					} else {
 						// Скрываем статус с задержкой 500мс
