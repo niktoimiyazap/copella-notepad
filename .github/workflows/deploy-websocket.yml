@@ -26,6 +26,10 @@ jobs:
         script: |
           cd /home/vladikkrivolapovik/copella-notepad
           
+          echo "🔄 Resetting local changes..."
+          git reset --hard HEAD
+          git clean -fd
+          
           echo "📦 Pulling latest changes..."
           git pull origin main
           
