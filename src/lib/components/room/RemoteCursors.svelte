@@ -189,15 +189,31 @@
 	});
 
 	/**
-	 * Добавляем обработчик скролла при изменении editorElement
+	 * Обработчик обновления контента
+	 */
+	function handleContentUpdate() {
+		if (animationFrame) {
+			cancelAnimationFrame(animationFrame);
+		}
+		
+		animationFrame = requestAnimationFrame(() => {
+			updateCursors();
+		});
+	}
+
+	/**
+	 * Добавляем обработчики скролла и обновления контента
 	 */
 	$effect(() => {
 		if (editorElement) {
 			editorElement.addEventListener('scroll', handleEditorScroll);
+			// Слушаем событие обновления контента для обновления позиций курсоров
+			editorElement.addEventListener('content-updated', handleContentUpdate);
 			
 			return () => {
 				if (editorElement) {
 					editorElement.removeEventListener('scroll', handleEditorScroll);
+					editorElement.removeEventListener('content-updated', handleContentUpdate);
 				}
 			};
 		}

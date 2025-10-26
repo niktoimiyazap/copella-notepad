@@ -88,8 +88,9 @@ export function applyIncrementalUpdate(
   const temp = document.createElement('div');
   temp.innerHTML = newHTML;
   
-  // Применяем изменения инкрементально
-  morphDOM(container, temp);
+  // ВАЖНО: Морфим только детей, не сам контейнер
+  // Это сохраняет стили, классы и атрибуты контейнера (padding, background и т.д.)
+  morphChildren(container, temp);
   
   // Восстанавливаем курсор
   if (savedCursor) {

@@ -272,6 +272,10 @@
 			
 			if (hasChanges) {
 				content = newContent;
+				
+				// ВАЖНО: Триггерим событие для обновления курсоров других пользователей
+				// Это нужно чтобы курсоры "просыпались" после изменений в DOM
+				editorElement.dispatchEvent(new CustomEvent('content-updated'));
 			}
 			
 			// Восстанавливаем скролл
@@ -340,6 +344,12 @@
 		// Отправляем в менеджер diff-синхронизации немедленно
 		if (diffSyncManager) {
 			diffSyncManager.updateContent(content);
+		}
+		
+		// Триггерим обновление курсоров других пользователей после локального ввода
+		// Это гарантирует что курсоры двигаются при добавлении символов
+		if (editorElement) {
+			editorElement.dispatchEvent(new CustomEvent('content-updated'));
 		}
 		
 		// НЕ обновляем форматы и undo/redo на каждое нажатие - это замедляет ввод
