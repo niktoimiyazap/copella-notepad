@@ -1,5 +1,6 @@
 // Запуск WebSocket сервера
 // ВАЖНО: Загружаем переменные окружения ДО всех остальных импортов
+// Auto-deploy enabled via GitHub Actions
 import 'dotenv/config';
 
 import { createServer } from 'http';
