@@ -231,6 +231,21 @@ export class WebSocketManager {
             this.sendError(ws, 'Note ID, room ID and update are required');
           }
           break;
+        
+        // Yjs Awareness - синхронизация курсоров через Awareness Protocol
+        case 'awareness_update':
+          if (room_id && message.data?.noteId && message.data?.update) {
+            this.diffSyncHandler.handleAwarenessUpdate(
+              ws,
+              userId,
+              room_id,
+              {
+                noteId: message.data.noteId,
+                update: message.data.update
+              }
+            );
+          }
+          break;
 
         case 'cursor_update':
           if (room_id && message.data?.noteId) {

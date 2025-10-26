@@ -197,7 +197,37 @@ export class DiffSyncHandler {
   }
 
   /**
-   * Обработка обновления позиции курсора (с батчингом низкого приоритета)
+   * Обработка Awareness update от клиента (Yjs протокол для курсоров)
+   */
+  handleAwarenessUpdate(
+    ws: WebSocket,
+    userId: string,
+    roomId: string,
+    data: {
+      noteId: string;
+      update: number[];
+    }
+  ): void {
+    const { noteId, update } = data;
+
+    // Awareness updates транслируем напрямую без батчинга для low-latency курсоров
+    this.connectionHandler.broadcastToRoom(
+      roomId,
+      {
+        type: 'awareness_update',
+        room_id: roomId,
+        data: {
+          noteId,
+          update
+        },
+        timestamp: new Date()
+      },
+      userId
+    );
+  }
+  
+  /**
+   * Обработка обновления позиции курсора (fallback для старого протокола)
    */
   handleCursorUpdate(
     ws: WebSocket,

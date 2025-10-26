@@ -12,6 +12,7 @@
 	import { DiffSyncManager, type CursorInfo } from '../../utils/diffSync';
 	import { useWebSocket } from '../../websocket';
 	import { applyIncrementalUpdate } from '../../utils/domDiff';
+	import { currentUser } from '../../stores/user';
 	
 	type SyncStatus = 'connected' | 'syncing' | 'saved' | 'error';
 
@@ -599,7 +600,14 @@
 						}
 					}
 					
-					diffSyncManager?.updateCursor(position, selectionInfo);
+					// Передаем информацию о текущем пользователе в updateCursor
+					diffSyncManager?.updateCursor(
+						position,
+						selectionInfo,
+						$currentUser?.id,
+						$currentUser?.username || $currentUser?.email,
+						$currentUser?.avatarUrl
+					);
 				}
 			} catch (error) {
 				// Игнорируем ошибки

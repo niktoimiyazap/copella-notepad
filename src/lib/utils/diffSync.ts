@@ -1,5 +1,7 @@
 // Real-time collaborative editing client с использованием Yjs (CRDT)
 import * as Y from 'yjs';
+import { Awareness } from 'y-protocols/awareness';
+import { IndexeddbPersistence } from 'y-indexeddb';
 import { websocketClient } from '../websocket';
 import { WebSocketBatcher } from './websocketBatcher';
 
@@ -36,6 +38,8 @@ export class DiffSyncManager {
   private ydoc: Y.Doc;
   private ytext: Y.Text;
   private undoManager: Y.UndoManager;
+  private awareness: Awareness;
+  private indexeddbProvider: IndexeddbPersistence | null = null;
   private isActive = true;
   private isSyncing = false;
   private isInitialized = false;
@@ -104,6 +108,18 @@ export class DiffSyncManager {
     this.ydoc = new Y.Doc();
     this.ytext = this.ydoc.getText('content');
 
+    // Создаем Awareness для синхронизации курсоров и состояния пользователей
+    this.awareness = new Awareness(this.ydoc);
+    
+    // Инициализируем IndexedDB для offline-first и мгновенной загрузки
+    if (typeof window !== 'undefined') {
+      this.indexeddbProvider = new IndexeddbPersistence(`copella-note-${this.noteId}`, this.ydoc);
+      
+      this.indexeddbProvider.on('synced', () => {
+        console.log('[YjsSync] IndexedDB synced - content loaded from local cache');
+      });
+    }
+
     // Создаем Undo Manager с умными настройками
     this.undoManager = new Y.UndoManager(this.ytext, {
       trackedOrigins: new Set(['local']), // Отменяем только локальные изменения
@@ -136,8 +152,22 @@ export class DiffSyncManager {
         this.sendUpdate(update);
       }
     });
+    
+    // Подписываемся на изменения Awareness для синхронизации курсоров
+    this.awareness.on('change', () => {
+      this.handleAwarenessChange();
+    });
+    
+    // Подписываемся на awareness updates для отправки на сервер
+    this.awareness.on('update', ({ added, updated, removed }: any) => {
+      // Отправляем awareness update только если это локальное изменение
+      const changedClients = [...added, ...updated, ...removed];
+      if (changedClients.includes(this.awareness.clientID)) {
+        this.sendAwarenessUpdate();
+      }
+    });
 
-      this.initialize();
+    this.initialize();
   }
 
   /**
@@ -157,6 +187,7 @@ export class DiffSyncManager {
       // Подписываемся на сообщения
       websocketClient.onMessage('yjs_sync', this.messageHandler);
       websocketClient.onMessage('yjs_update', this.messageHandler);
+      websocketClient.onMessage('awareness_update', this.messageHandler);
       websocketClient.onMessage('cursor_update', this.messageHandler);
       websocketClient.onMessage('cursor_remove', this.messageHandler);
       websocketClient.onMessage('note_saved', this.messageHandler);
@@ -209,6 +240,10 @@ export class DiffSyncManager {
         
         case 'yjs_update':
           this.handleYjsUpdate(message.data);
+          break;
+        
+        case 'awareness_update':
+          this.handleAwarenessUpdate(message.data);
           break;
         
         case 'cursor_update':
@@ -347,6 +382,52 @@ export class DiffSyncManager {
       }
     }, 100);
   }
+  
+  /**
+   * Отправка awareness update на сервер
+   */
+  private sendAwarenessUpdate() {
+    if (!websocketClient || !this.isActive || !this.isInitialized) return;
+    
+    // Кодируем локальное состояние awareness
+    import('y-protocols/awareness').then(({ encodeAwarenessUpdate }) => {
+      const awarenessUpdate = encodeAwarenessUpdate(this.awareness, [this.awareness.clientID]);
+      
+      websocketClient.send({
+        type: 'awareness_update',
+        room_id: this.roomId,
+        data: {
+          noteId: this.noteId,
+          update: Array.from(awarenessUpdate)
+        }
+      });
+    });
+  }
+  
+  /**
+   * Обработка awareness update от другого клиента
+   */
+  private handleAwarenessUpdate(data: { noteId: string; update: number[] }) {
+    if (data.noteId !== this.noteId) return;
+    
+    try {
+      // Валидация данных
+      if (!data.update || !Array.isArray(data.update) || data.update.length === 0) {
+        return;
+      }
+      
+      // Конвертируем массив обратно в Uint8Array
+      const update = new Uint8Array(data.update);
+      
+      // Применяем awareness update
+      import('y-protocols/awareness').then(({ applyAwarenessUpdate }) => {
+        applyAwarenessUpdate(this.awareness, update, null);
+      });
+    } catch (error: any) {
+      // Игнорируем ошибки awareness updates
+      console.warn('[YjsSync] Error applying awareness update:', error.message);
+    }
+  }
 
   /**
    * Хеширование строки для получения стабильного индекса цвета
@@ -386,7 +467,43 @@ export class DiffSyncManager {
   }
 
   /**
-   * Обработка обновления курсора
+   * Обработка изменений Awareness (курсоры других пользователей)
+   */
+  private handleAwarenessChange() {
+    const states = this.awareness.getStates();
+    const localClientId = this.awareness.clientID;
+    
+    // Очищаем старые курсоры
+    this.remoteCursors.clear();
+    
+    // Обрабатываем состояния всех клиентов
+    states.forEach((state, clientId) => {
+      // Пропускаем свой собственный курсор
+      if (clientId === localClientId) return;
+      
+      const cursor = state.cursor;
+      if (!cursor || !cursor.userId) return;
+      
+      // Получаем стабильный цвет для пользователя
+      const color = this.getUserColor(cursor.userId);
+      
+      this.remoteCursors.set(cursor.userId, {
+        userId: cursor.userId,
+        username: cursor.username,
+        avatarUrl: cursor.avatarUrl,
+        position: cursor.position || 0,
+        selection: cursor.selection,
+        color,
+        timestamp: Date.now(),
+        noteId: this.noteId
+      });
+    });
+    
+    this.onCursorsUpdate(new Map(this.remoteCursors));
+  }
+  
+  /**
+   * Обработка обновления курсора (fallback для старого протокола)
    */
   private handleCursorUpdate(data: CursorInfo) {
     if (data.noteId !== this.noteId) return;
@@ -541,24 +658,15 @@ export class DiffSyncManager {
 
 
   /**
-   * Обновление позиции курсора с адаптивным throttling
+   * Обновление позиции курсора через Yjs Awareness (оптимизировано)
    */
-  public updateCursor(position: number, selection?: { start: number; end: number }) {
-    if (!websocketClient || !this.isActive) return;
+  public updateCursor(position: number, selection?: { start: number; end: number }, userId?: string, username?: string, avatarUrl?: string) {
+    if (!this.isActive) return;
     
     // Если position === -1, это значит убрать курсор (blur)
     if (position === -1) {
-      // Удаление курсора всегда немедленное
-      if (this.cursorBatcher) {
-        this.cursorBatcher.flush();
-      }
-      websocketClient.send({
-        type: 'cursor_remove',
-        room_id: this.roomId,
-        data: {
-          noteId: this.noteId
-        }
-      });
+      // Удаляем локальное состояние awareness
+      this.awareness.setLocalStateField('cursor', null);
       
       // Сбрасываем сохраненную позицию
       this.lastCursorPosition = -1;
@@ -579,7 +687,6 @@ export class DiffSyncManager {
     const now = Date.now();
     if (now - this.lastCursorUpdate < this.cursorThrottle) {
       // Пропускаем обновление из-за throttle
-      // НО сохраняем позицию чтобы отправить позже если она изменится
       return;
     }
     
@@ -588,23 +695,17 @@ export class DiffSyncManager {
     this.lastCursorSelection = selection ? { ...selection } : undefined;
     this.lastCursorUpdate = now;
     
-    const cursorMessage = {
-      type: 'cursor_update',
-      room_id: this.roomId,
-      data: {
-        noteId: this.noteId,
-        position,
-        selection
-      }
-    };
-    
-    // На мобильных используем батчинг
-    if (this.cursorBatcher) {
-      this.cursorBatcher.enqueue(cursorMessage, 'low');
-    } else {
-      // На desktop отправляем напрямую
-      websocketClient.send(cursorMessage);
-    }
+    // Обновляем локальное состояние awareness
+    // Awareness автоматически синхронизирует это состояние с другими клиентами
+    this.awareness.setLocalStateField('cursor', {
+      userId: userId || 'unknown',
+      username,
+      avatarUrl,
+      position,
+      selection,
+      noteId: this.noteId,
+      timestamp: now
+    });
   }
   
   /**
@@ -690,16 +791,11 @@ export class DiffSyncManager {
   public destroy() {
     this.isActive = false;
     
-    // Отправляем cursor_remove при уничтожении менеджера (смена заметки)
-    if (websocketClient) {
-      websocketClient.send({
-        type: 'cursor_remove',
-        room_id: this.roomId,
-        data: {
-          noteId: this.noteId
-        }
-      });
-    }
+    // Удаляем локальное состояние awareness (курсор)
+    this.awareness.setLocalState(null);
+    
+    // Уничтожаем awareness
+    this.awareness.destroy();
     
     // Флашим и уничтожаем батчер
     if (this.cursorBatcher) {
@@ -720,10 +816,17 @@ export class DiffSyncManager {
     this.lastCursorSelection = undefined;
     this.lastCursorUpdate = 0;
     
+    // Закрываем IndexedDB провайдер
+    if (this.indexeddbProvider) {
+      this.indexeddbProvider.destroy();
+      this.indexeddbProvider = null;
+    }
+    
     // Отписываемся от WebSocket сообщений
     if (websocketClient && this.messageHandler) {
       websocketClient.offMessage('yjs_sync', this.messageHandler);
       websocketClient.offMessage('yjs_update', this.messageHandler);
+      websocketClient.offMessage('awareness_update', this.messageHandler);
       websocketClient.offMessage('cursor_update', this.messageHandler);
       websocketClient.offMessage('cursor_remove', this.messageHandler);
       websocketClient.offMessage('note_saved', this.messageHandler);
