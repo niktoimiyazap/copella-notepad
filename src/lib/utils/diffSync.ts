@@ -46,9 +46,7 @@ export class DiffSyncManager {
   private pendingContentUpdate: string | null = null;
   private contentUpdateTimeout: ReturnType<typeof setTimeout> | null = null;
 
-  // Дедупликация для защиты от зацикливания
-  private lastSentContentHash: string = '';
-  private lastAppliedRemoteHash: string = '';
+  // Защита от зацикливания (флаг обновления)
   private updateInProgress = false;
 
   // Цвета для пользователей
@@ -94,21 +92,11 @@ export class DiffSyncManager {
         const content = this.ytext.toString();
         const contentHash = this.hashContent(content);
         
+        // Хеш-дедупликация отключена - Yjs сам управляет дедупликацией
         console.log('[YjsSync] Remote update received:', {
           contentHash,
-          lastAppliedHash: this.lastAppliedRemoteHash,
-          isDuplicate: contentHash === this.lastAppliedRemoteHash,
           contentLength: content.length
         });
-        
-        // КРИТИЧНО: Проверяем хеш чтобы не применять одинаковый контент повторно
-        if (contentHash === this.lastAppliedRemoteHash) {
-          console.warn('[YjsSync] BLOCKED: Same remote hash, skipping to prevent loop');
-          return;
-        }
-        
-        // Сохраняем хеш примененного remote контента
-        this.lastAppliedRemoteHash = contentHash;
         
         console.log('[YjsSync] Applying remote update to editor');
         this.onContentUpdate(content);
@@ -468,20 +456,14 @@ export class DiffSyncManager {
       return;
     }
     
-    // КРИТИЧНО: Проверяем хеш чтобы не отправлять одинаковые обновления
+    // Хеш-дедупликация отключена - Yjs сам обеспечивает правильную дедупликацию через CRDT
     const newHash = this.hashContent(newContent);
-    console.log('[YjsSync] Content hash check:', {
-      newHash,
-      lastSentHash: this.lastSentContentHash,
-      isDuplicate: newHash === this.lastSentContentHash,
+    console.log('[YjsSync] Applying local update:', {
+      hash: newHash,
       newLength: newContent.length,
-      currentLength: currentContent.length
+      currentLength: currentContent.length,
+      diff: newContent.length - currentContent.length
     });
-    
-    if (newHash === this.lastSentContentHash) {
-      console.warn('[YjsSync] BLOCKED: Same content hash, skipping duplicate update');
-      return;
-    }
     
     // Убрана проверка на "большое изменение" - она блокировала нормальные обновления
     // Yjs сам обеспечивает правильную синхронизацию через CRDT
@@ -518,10 +500,7 @@ export class DiffSyncManager {
         }
       }, 'local'); // Указываем origin 'local' для отслеживания в UndoManager
       
-      // Сохраняем хеш отправленного контента для дедупликации
-      this.lastSentContentHash = newHash;
-      
-      console.log('[YjsSync] ✅ Update applied successfully, new hash saved:', newHash);
+      console.log('[YjsSync] ✅ Update applied successfully, hash:', newHash);
       
       // Yjs автоматически генерирует update event, который отправится на сервер
       // через обработчик ydoc.on('update') в конструкторе
