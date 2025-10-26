@@ -147,24 +147,7 @@
 						return;
 					}
 					
-					// Throttle: не обновляем DOM чаще чем раз в 50ms для быстрого отклика
-					const now = Date.now();
-					const timeSinceLastUpdate = now - lastRemoteUpdateTime;
-					
-					if (timeSinceLastUpdate < 50 && !isFocused) {
-						// Сохраняем pending обновление
-						pendingRemoteUpdate = newContent;
-						
-						// Если таймер не установлен, устанавливаем
-						if (!remoteUpdateTimeout) {
-							remoteUpdateTimeout = setTimeout(() => {
-								applyRemoteUpdate();
-							}, 50 - timeSinceLastUpdate);
-						}
-						return;
-					}
-					
-					// Применяем обновление немедленно
+					// Применяем обновление немедленно без throttle для real-time sync
 					applyRemoteContentUpdate(newContent);
 				},
 				onCursorsUpdate: (cursors) => {
@@ -351,7 +334,7 @@
 			clearTimeout(typingTimeout);
 		}
 		
-		// Сбрасываем флаг isTyping через короткую паузу после последнего символа
+		// Сбрасываем флаг isTyping почти мгновенно для instant remote updates
 		typingTimeout = setTimeout(() => {
 			isTyping = false;
 			
@@ -359,7 +342,7 @@
 			if (pendingRemoteUpdate) {
 				applyRemoteUpdate();
 			}
-		}, 100); // 100мс - быстрое применение remote обновлений после паузы в печатании
+		}, 30); // 30мс - мгновенное применение remote обновлений
 		
 		// Убираем placeholder при вводе текста
 		if (target.innerHTML === '<br>' || target.innerHTML === '') {
@@ -711,13 +694,8 @@
 			}
 		};
 		
-		// Если immediate=true (во время выделения мышью), обновляем немедленно без задержки
-		if (immediate) {
-			doUpdate();
-		} else {
-			// Задержка для батчинга - 50ms достаточно для группировки быстрых движений
-			cursorUpdateTimeout = setTimeout(doUpdate, 50);
-		}
+		// Обновляем немедленно для real-time синхронизации
+		doUpdate();
 	}
 
 	// Получение позиции курсора в тексте

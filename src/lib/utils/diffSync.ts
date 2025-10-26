@@ -437,11 +437,11 @@ export class DiffSyncManager {
       clearTimeout(this.contentUpdateTimeout);
     }
     
-    // Применяем с задержкой для батчинга быстрых изменений
-    // 16ms = ~60 FPS для быстрого отклика при печатании
+    // Применяем немедленно без задержки для real-time синхронизации
+    // 0ms = instant updates, максимально быстрая синхронизация
     this.contentUpdateTimeout = setTimeout(() => {
       this.applyContentUpdate();
-    }, 16); // 16ms батчинг - мгновенный отклик при печатании
+    }, 0); // Instant sync - нет батчинга
   }
 
   /**
@@ -475,11 +475,16 @@ export class DiffSyncManager {
     }
     
     // ВАЖНО: Проверяем что изменение не слишком большое
-    // Если изменение > 50% документа, возможно это конфликт - игнорируем
+    // НО разрешаем полное удаление (newContent пустой или почти пустой)
     const changeSize = Math.abs(newContent.length - currentContent.length);
-    if (currentContent.length > 100 && changeSize > currentContent.length * 0.5) {
+    const isDeletion = newContent.length < 10; // Полное удаление или почти полное
+    if (!isDeletion && currentContent.length > 100 && changeSize > currentContent.length * 0.5) {
       console.warn('[YjsSync] Large change detected, possible conflict. Skipping to avoid duplication.');
       return;
+    }
+    
+    if (isDeletion && currentContent.length > 0) {
+      console.log('[YjsSync] Full deletion detected, allowing');
     }
     
     // Вычисляем умный diff: находим общий префикс и суффикс
