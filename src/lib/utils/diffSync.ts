@@ -1,6 +1,7 @@
 // Real-time collaborative editing client с использованием Yjs (CRDT)
 import * as Y from 'yjs';
 import { websocketClient } from '../websocket';
+import { WebSocketBatcher } from './websocketBatcher';
 
 export interface CursorInfo {
   userId: string;
@@ -12,6 +13,14 @@ export interface CursorInfo {
   timestamp: number;
   noteId?: string;
 }
+
+// Детект мобильного устройства
+const isMobileDevice = (): boolean => {
+  if (typeof window === 'undefined') return false;
+  return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
+    navigator.userAgent
+  ) || window.matchMedia('(max-width: 768px)').matches;
+};
 
 interface DiffSyncOptions {
   noteId: string;
@@ -42,12 +51,18 @@ export class DiffSyncManager {
   // WebSocket
   private messageHandler: ((message: any) => void) | null = null;
 
-  // Батчинг для обновлений контента
+  // Батчинг для обновлений контента (адаптивный для мобильных)
   private pendingContentUpdate: string | null = null;
   private contentUpdateTimeout: ReturnType<typeof setTimeout> | null = null;
+  private isMobile: boolean = isMobileDevice();
 
   // Защита от зацикливания (флаг обновления)
   private updateInProgress = false;
+  
+  // Батчинг для cursor updates (только для мобильных)
+  private cursorBatcher: WebSocketBatcher | null = null;
+  private lastCursorUpdate: number = 0;
+  private cursorThrottle: number;
 
   // Цвета для пользователей
   private userColors = new Map<string, string>();
@@ -65,6 +80,20 @@ export class DiffSyncManager {
     this.onCursorsUpdate = options.onCursorsUpdate;
     this.onSyncStatus = options.onSyncStatus;
 
+    // Адаптивный throttle для курсора
+    this.cursorThrottle = this.isMobile ? 50 : 16; // 20fps на мобильных, 60fps на десктопе
+
+    // Создаем батчер для cursor updates (только для мобильных)
+    if (this.isMobile) {
+      this.cursorBatcher = new WebSocketBatcher((messages) => {
+        // Отправляем только последнее обновление курсора из батча
+        const lastCursor = messages[messages.length - 1];
+        if (lastCursor && websocketClient) {
+          websocketClient.send(lastCursor);
+        }
+      });
+    }
+
     // Создаем Yjs документ
     this.ydoc = new Y.Doc();
     this.ytext = this.ydoc.getText('content');
@@ -72,7 +101,7 @@ export class DiffSyncManager {
     // Создаем Undo Manager с умными настройками
     this.undoManager = new Y.UndoManager(this.ytext, {
       trackedOrigins: new Set(['local']), // Отменяем только локальные изменения
-      captureTimeout: 500 // Группируем быстрые изменения (печать) в одну отмену
+      captureTimeout: this.isMobile ? 800 : 500 // Больше времени для группировки на мобильных
     });
 
     // Подписываемся на изменения в Yjs документе
@@ -391,6 +420,7 @@ export class DiffSyncManager {
 
   /**
    * Обновление локального контента (вызывается при редактировании)
+   * Адаптивная задержка в зависимости от устройства
    */
   public updateContent(newContent: string) {
     if (!this.isActive || !this.isInitialized) return;
@@ -403,10 +433,12 @@ export class DiffSyncManager {
       clearTimeout(this.contentUpdateTimeout);
     }
     
-    // Немедленная синхронизация для минимальной задержки
+    // Адаптивная задержка: 0ms для desktop, 16ms для mobile (60fps)
+    const delay = this.isMobile ? 16 : 0;
+    
     this.contentUpdateTimeout = setTimeout(() => {
       this.applyContentUpdate();
-    }, 0);
+    }, delay);
   }
 
   /**
@@ -474,13 +506,17 @@ export class DiffSyncManager {
 
 
   /**
-   * Обновление позиции курсора
+   * Обновление позиции курсора с адаптивным throttling
    */
   public updateCursor(position: number, selection?: { start: number; end: number }) {
     if (!websocketClient || !this.isActive) return;
     
     // Если position === -1, это значит убрать курсор (blur)
     if (position === -1) {
+      // Удаление курсора всегда немедленное
+      if (this.cursorBatcher) {
+        this.cursorBatcher.flush();
+      }
       websocketClient.send({
         type: 'cursor_remove',
         room_id: this.roomId,
@@ -491,7 +527,15 @@ export class DiffSyncManager {
       return;
     }
     
-    websocketClient.send({
+    // Throttling для cursor updates
+    const now = Date.now();
+    if (now - this.lastCursorUpdate < this.cursorThrottle) {
+      // Пропускаем обновление, но сохраняем последнее значение
+      return;
+    }
+    this.lastCursorUpdate = now;
+    
+    const cursorMessage = {
       type: 'cursor_update',
       room_id: this.roomId,
       data: {
@@ -499,7 +543,15 @@ export class DiffSyncManager {
         position,
         selection
       }
-    });
+    };
+    
+    // На мобильных используем батчинг
+    if (this.cursorBatcher) {
+      this.cursorBatcher.enqueue(cursorMessage, 'low');
+    } else {
+      // На desktop отправляем напрямую
+      websocketClient.send(cursorMessage);
+    }
   }
 
   /**
@@ -565,6 +617,13 @@ export class DiffSyncManager {
    */
   public destroy() {
     this.isActive = false;
+    
+    // Флашим и уничтожаем батчер
+    if (this.cursorBatcher) {
+      this.cursorBatcher.flush();
+      this.cursorBatcher.destroy();
+      this.cursorBatcher = null;
+    }
     
     // Очищаем pending обновления
     if (this.contentUpdateTimeout) {

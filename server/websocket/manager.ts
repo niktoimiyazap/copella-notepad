@@ -26,9 +26,23 @@ export class WebSocketManager {
       process.env.PUBLIC_FRONTEND_URL,
     ].filter(Boolean);
 
-    // Настройка WebSocketServer с проверкой origin
+    // Настройка WebSocketServer с проверкой origin и compression
     this.wss = new WebSocketServer({ 
       server,
+      // Включаем perMessageDeflate compression для уменьшения размера сообщений
+      perMessageDeflate: {
+        zlibDeflateOptions: {
+          // Уровень компрессии 6 = баланс между скоростью и размером
+          level: 6,
+        },
+        zlibInflateOptions: {
+          chunkSize: 10 * 1024
+        },
+        // Сжимаем только сообщения больше 1KB
+        threshold: 1024,
+        // Limit concurrency для мобильных устройств
+        concurrencyLimit: 10,
+      },
       // Проверка origin перед установкой соединения
       verifyClient: (info) => {
         const origin = info.origin || info.req.headers.origin;

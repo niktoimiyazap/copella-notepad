@@ -3,6 +3,7 @@ import { prisma } from '../../database/prisma.js';
 import type { ConnectionHandler } from './connectionHandler.js';
 import type { WebSocket } from 'ws';
 import * as Y from 'yjs';
+import { ServerBatcher } from '../serverBatcher.js';
 
 interface CursorPosition {
   noteId: string;
@@ -21,10 +22,20 @@ const SAVE_DELAY = 2000; // 2 секунды задержка перед сох�
 
 export class DiffSyncHandler {
   private connectionHandler: ConnectionHandler;
+  private batcher: ServerBatcher;
 
   constructor(connectionHandler: ConnectionHandler) {
     this.connectionHandler = connectionHandler;
-    console.log('[YjsSyncHandler] Initialized');
+    
+    // Создаем батчер для эффективной отправки обновлений
+    this.batcher = new ServerBatcher((roomId, messages, excludeUserId) => {
+      // Отправляем батч сообщений
+      for (const message of messages) {
+        this.connectionHandler.broadcastToRoom(roomId, message, excludeUserId);
+      }
+    });
+    
+    console.log('[YjsSyncHandler] Initialized with batching');
   }
 
   /**
@@ -186,7 +197,7 @@ export class DiffSyncHandler {
   }
 
   /**
-   * Обработка обновления позиции курсора
+   * Обработка обновления позиции курсора (с батчингом низкого приоритета)
    */
   handleCursorUpdate(
     ws: WebSocket,
@@ -212,8 +223,8 @@ export class DiffSyncHandler {
       timestamp: Date.now()
     };
 
-    // Транслируем всем кроме отправителя
-    this.connectionHandler.broadcastToRoom(
+    // Cursor updates имеют низкий приоритет - батчатся и отправляются позже
+    this.batcher.enqueue(
       roomId,
       {
         type: 'cursor_update',
@@ -221,7 +232,8 @@ export class DiffSyncHandler {
         data: cursorData,
         timestamp: new Date()
       },
-      userId
+      userId,
+      'low' // Низкий приоритет для cursor updates
     );
   }
 
@@ -253,7 +265,7 @@ export class DiffSyncHandler {
   }
 
   /**
-   * Трансляция update другим клиентам
+   * Трансляция update другим клиентам (с батчингом)
    */
   private broadcastUpdate(
     roomId: string,
@@ -261,7 +273,8 @@ export class DiffSyncHandler {
     update: number[],
     excludeUserId: string
   ): void {
-    this.connectionHandler.broadcastToRoom(
+    // Yjs updates имеют высокий приоритет
+    this.batcher.enqueue(
       roomId,
       {
         type: 'yjs_update',
@@ -272,7 +285,8 @@ export class DiffSyncHandler {
         },
         timestamp: new Date()
       },
-      excludeUserId
+      excludeUserId,
+      'high' // Высокий приоритет для content updates
     );
   }
 
@@ -435,7 +449,15 @@ export class DiffSyncHandler {
    */
   async shutdown(): Promise<void> {
     console.log('[YjsSyncHandler] Shutting down...');
+    
+    // Флашим все батчи перед сохранением
+    this.batcher.flushAll();
+    
+    // Сохраняем все заметки
     await this.flushAll();
+    
+    // Уничтожаем батчер
+    this.batcher.destroy();
     
     // Уничтожаем все Y.Doc
     for (const ydoc of noteDocs.values()) {
