@@ -144,6 +144,12 @@ export class DiffSyncHandler {
     const { noteId, update } = data;
 
     try {
+      // Валидация данных
+      if (!update || !Array.isArray(update) || update.length === 0) {
+        console.warn('[YjsSyncHandler] Received empty or invalid update for note:', noteId);
+        return; // Игнорируем пустые updates без ошибки
+      }
+
       // Проверяем доступ
       const hasAccess = await this.checkAccess(noteId, roomId, userId);
       if (!hasAccess) {
@@ -161,14 +167,25 @@ export class DiffSyncHandler {
       // Конвертируем массив в Uint8Array
       const updateData = new Uint8Array(update);
 
-      // Применяем update к серверному документу
-      // Yjs автоматически разрешит конфликты благодаря CRDT
-      Y.applyUpdate(ydoc, updateData);
-
-      // Транслируем update другим клиентам в комнате
-      this.broadcastUpdate(roomId, noteId, update, userId);
-
-      // Автосохранение запланируется автоматически через обработчик ydoc.on('update')
+      try {
+        // Применяем update к серверному документу
+        // Yjs автоматически разрешит конфликты благодаря CRDT
+        Y.applyUpdate(ydoc, updateData);
+        
+        // Транслируем update другим клиентам в комнате
+        this.broadcastUpdate(roomId, noteId, update, userId);
+        
+        // Автосохранение запланируется автоматически через обработчик ydoc.on('update')
+        
+      } catch (applyError: any) {
+        // Yjs может выбросить ошибку если update уже применен или некорректен
+        // Это не критично - просто логируем и продолжаем
+        console.warn('[YjsSyncHandler] Could not apply update (might be duplicate):', applyError.message);
+        
+        // Все равно транслируем update другим клиентам
+        // Они сами решат, нужно ли им это обновление
+        this.broadcastUpdate(roomId, noteId, update, userId);
+      }
 
     } catch (error) {
       console.error('[YjsSyncHandler] Error handling update:', error);

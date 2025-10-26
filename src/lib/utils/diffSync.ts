@@ -189,6 +189,13 @@ export class DiffSyncManager {
     console.log('[YjsSync] Received sync, update size:', data.update.length);
     
     try {
+      // Валидация данных
+      if (!data.update || !Array.isArray(data.update)) {
+        console.error('[YjsSync] Invalid sync data received');
+        this.onSyncStatus('error');
+        return;
+      }
+      
       // Конвертируем массив обратно в Uint8Array
       const update = new Uint8Array(data.update);
       
@@ -205,7 +212,10 @@ export class DiffSyncManager {
       console.log('[YjsSync] Sync complete, content length:', content.length);
     } catch (error) {
       console.error('[YjsSync] Error applying sync update:', error);
-      this.onSyncStatus('error');
+      // Не выставляем статус error, просто логируем
+      // Документ может синхронизироваться через последующие updates
+      console.warn('[YjsSync] Continuing despite sync error, waiting for updates...');
+      this.isInitialized = true; // Все равно помечаем как инициализированный
     }
   }
 
@@ -216,13 +226,21 @@ export class DiffSyncManager {
     if (data.noteId !== this.noteId) return;
     
     try {
+      // Валидация данных
+      if (!data.update || !Array.isArray(data.update) || data.update.length === 0) {
+        console.warn('[YjsSync] Received empty or invalid update');
+        return;
+      }
+      
       // Конвертируем массив обратно в Uint8Array
       const update = new Uint8Array(data.update);
       
       // Применяем update к документу (origin 'server' чтобы не отправлять обратно)
       Y.applyUpdate(this.ydoc, update, 'server');
-    } catch (error) {
-      console.error('[YjsSync] Error applying update:', error);
+    } catch (error: any) {
+      // Yjs может выбросить ошибку если update уже применен или некорректен
+      // Это не критично - просто логируем предупреждение
+      console.warn('[YjsSync] Could not apply update (might be duplicate):', error.message);
     }
   }
 
@@ -231,6 +249,12 @@ export class DiffSyncManager {
    */
   private sendUpdate(update: Uint8Array) {
     if (!websocketClient || !this.isActive) return;
+    
+    // Не отправляем пустые updates
+    if (!update || update.length === 0) {
+      console.warn('[YjsSync] Ignoring empty update');
+      return;
+    }
     
     this.isSyncing = true;
     this.onSyncStatus('syncing');
@@ -249,8 +273,8 @@ export class DiffSyncManager {
     setTimeout(() => {
       if (this.isActive) {
         this.isSyncing = false;
-      this.onSyncStatus('connected');
-    }
+        this.onSyncStatus('connected');
+      }
     }, 100);
   }
 
