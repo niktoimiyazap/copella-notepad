@@ -63,6 +63,10 @@ export class DiffSyncManager {
   private cursorBatcher: WebSocketBatcher | null = null;
   private lastCursorUpdate: number = 0;
   private cursorThrottle: number;
+  
+  // Отслеживание последней позиции курсора для предотвращения дублирующих обновлений
+  private lastCursorPosition: number = -1;
+  private lastCursorSelection: { start: number; end: number } | undefined = undefined;
 
   // Цвета для пользователей
   private userColors = new Map<string, string>();
@@ -81,7 +85,9 @@ export class DiffSyncManager {
     this.onSyncStatus = options.onSyncStatus;
 
     // Адаптивный throttle для курсора
-    this.cursorThrottle = this.isMobile ? 50 : 16; // 20fps на мобильных, 60fps на десктопе
+    // На мобильных: 200ms = 5 обновлений в секунду (достаточно для отображения курсора)
+    // На десктопе: 50ms = 20 обновлений в секунду (плавнее, но не перегружает)
+    this.cursorThrottle = this.isMobile ? 200 : 50;
 
     // Создаем батчер для cursor updates (только для мобильных)
     if (this.isMobile) {
@@ -553,15 +559,33 @@ export class DiffSyncManager {
           noteId: this.noteId
         }
       });
+      
+      // Сбрасываем сохраненную позицию
+      this.lastCursorPosition = -1;
+      this.lastCursorSelection = undefined;
+      return;
+    }
+    
+    // КРИТИЧНО: Проверяем изменилась ли вообще позиция курсора
+    const selectionChanged = this.hasSelectionChanged(selection);
+    const positionChanged = position !== this.lastCursorPosition;
+    
+    if (!positionChanged && !selectionChanged) {
+      // Позиция и выделение не изменились - не отправляем дублирующее обновление
       return;
     }
     
     // Throttling для cursor updates
     const now = Date.now();
     if (now - this.lastCursorUpdate < this.cursorThrottle) {
-      // Пропускаем обновление, но сохраняем последнее значение
+      // Пропускаем обновление из-за throttle
+      // НО сохраняем позицию чтобы отправить позже если она изменится
       return;
     }
+    
+    // Сохраняем текущую позицию для следующей проверки
+    this.lastCursorPosition = position;
+    this.lastCursorSelection = selection ? { ...selection } : undefined;
     this.lastCursorUpdate = now;
     
     const cursorMessage = {
@@ -581,6 +605,25 @@ export class DiffSyncManager {
       // На desktop отправляем напрямую
       websocketClient.send(cursorMessage);
     }
+  }
+  
+  /**
+   * Проверка изменилось ли выделение
+   */
+  private hasSelectionChanged(selection?: { start: number; end: number }): boolean {
+    // Оба undefined - не изменилось
+    if (!selection && !this.lastCursorSelection) {
+      return false;
+    }
+    
+    // Одно есть, другого нет - изменилось
+    if (!selection || !this.lastCursorSelection) {
+      return true;
+    }
+    
+    // Сравниваем координаты
+    return selection.start !== this.lastCursorSelection.start || 
+           selection.end !== this.lastCursorSelection.end;
   }
 
   /**
@@ -671,6 +714,11 @@ export class DiffSyncManager {
       this.contentUpdateTimeout = null;
     }
     this.pendingContentUpdate = null;
+    
+    // Сбрасываем сохраненную позицию курсора
+    this.lastCursorPosition = -1;
+    this.lastCursorSelection = undefined;
+    this.lastCursorUpdate = 0;
     
     // Отписываемся от WebSocket сообщений
     if (websocketClient && this.messageHandler) {
