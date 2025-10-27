@@ -142,24 +142,7 @@
 			}
 
 		// Инициализируем отслеживание онлайн статуса участников
-		// И ждем подключения к WebSocket ПЕРЕД показом интерфейса
-		// ТОЛЬКО если пользователь является участником комнаты
-		if ($currentUser?.id) {
-			// Проверяем, является ли пользователь участником комнаты
-			const isParticipant = roomData.participants.some(p => p.userId === $currentUser.id);
-			
-			if (isParticipant) {
-				// Отключаем старое соединение если оно есть
-				if (disconnectOnlineTracking) {
-					disconnectOnlineTracking();
-				}
-				
-			// Yjs автоматически обрабатывает онлайн статусы участников
-				}
-			} else {
-				console.log('[Room] User is not a participant, skipping WebSocket connection');
-			}
-		}
+		// Yjs автоматически обрабатывает онлайн статусы участников
 
 			// Скрываем загрузку после подключения к WebSocket
 			showLoading = false;
@@ -442,21 +425,8 @@
 		// И ждем подключения к WebSocket ПЕРЕД показом интерфейса
 		// ТОЛЬКО если пользователь является участником комнаты
 		if ($currentUser?.id) {
-			// Проверяем, является ли пользователь участником комнаты
-			const isParticipant = roomData.participants.some(p => p.userId === $currentUser.id);
-			
-			if (isParticipant) {
-				// Отключаем старое соединение если оно есть
-				if (disconnectOnlineTracking) {
-					disconnectOnlineTracking();
-				}
-				
-			// Yjs автоматически обрабатывает онлайн статусы участников
-				}
-			} else {
-				console.log('[Room] User is not a participant, skipping WebSocket reconnection');
-			}
-		}
+	// Yjs автоматически обрабатывает онлайн статусы участников
+	}
 
 			// Скрываем загрузку после подключения к WebSocket
 			showLoading = false;
