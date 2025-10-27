@@ -1,5 +1,5 @@
 import { json } from '@sveltejs/kit';
-import { supabase } from '$lib/supabase';
+import { supabase } from '$lib/supabase-server';
 import { ensureUserProfile } from '$lib/utils/userManagement';
 import type { RequestHandler } from './$types';
 

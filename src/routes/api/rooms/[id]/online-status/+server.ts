@@ -1,7 +1,7 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { updateUserOnlineStatus } from '$lib/permissions';
-import { supabase } from '$lib/supabase';
+import { supabase } from '$lib/supabase-server';
 
 // Функция для получения текущего пользователя из токена
 async function getCurrentUserFromToken(request: Request) {

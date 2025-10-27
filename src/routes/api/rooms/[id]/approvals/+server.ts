@@ -1,7 +1,7 @@
 // API endpoint для получения списка ожидающих заявок
 import { json } from '@sveltejs/kit';
 import { prisma } from '$lib/prisma';
-import { supabase } from '$lib/supabase';
+import { supabase } from '$lib/supabase-server';
 import type { RequestHandler } from './$types';
 
 // Получение всех заявок ожидающих одобрения (только для владельца)
