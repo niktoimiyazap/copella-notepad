@@ -78,9 +78,9 @@ export const POST: RequestHandler = async ({ request, params, url }) => {
 		// Проверяем, требуется ли одобрение владельца
 		const room = await prisma.room.findUnique({
 			where: { id: roomId },
-			select: { requiresApproval: true }
+			select: { requireApproval: true }
 		});
-		const requiresApproval = room?.requiresApproval || false;
+		const requiresApproval = room?.requireApproval || false;
 
 		// Отправляем уведомление о новом приглашении
 		await notifyInviteCreated(roomId, {
