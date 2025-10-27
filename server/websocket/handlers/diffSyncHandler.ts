@@ -88,31 +88,69 @@ export class DiffSyncHandler {
             signaling: [
               'ws://localhost:4444'  // Локальный signaling на том же сервере
             ],
-            // STUN серверы для NAT traversal
+            // STUN/TURN серверы для NAT traversal (максимальная совместимость)
             peerOpts: {
               config: {
                 iceServers: [
+                  // Google STUN серверы
                   { urls: 'stun:stun.l.google.com:19302' },
                   { urls: 'stun:stun1.l.google.com:19302' },
-                  { urls: 'stun:stun2.l.google.com:19302' }
-                ]
+                  { urls: 'stun:stun2.l.google.com:19302' },
+                  { urls: 'stun:stun3.l.google.com:19302' },
+                  { urls: 'stun:stun4.l.google.com:19302' },
+                  // Дополнительные STUN
+                  { urls: 'stun:stun.stunprotocol.org:3478' },
+                  { urls: 'stun:stun.voip.blackberry.com:3478' },
+                  // TURN серверы для прохождения NAT
+                  {
+                    urls: 'turn:openrelay.metered.ca:80',
+                    username: 'openrelayproject',
+                    credential: 'openrelayproject'
+                  },
+                  {
+                    urls: 'turn:openrelay.metered.ca:443',
+                    username: 'openrelayproject',
+                    credential: 'openrelayproject'
+                  },
+                  {
+                    urls: 'turn:openrelay.metered.ca:443?transport=tcp',
+                    username: 'openrelayproject',
+                    credential: 'openrelayproject'
+                  }
+                ],
+                iceCandidatePoolSize: 10,
+                iceTransportPolicy: 'all'
               }
             },
-            maxConns: 50 // Больше на сервере
+            maxConns: 50, // Больше на сервере
+            filterBcConns: true
           }
         );
 
         webrtcProvider.on('synced', () => {
-          console.log(`[WebRTC Server] ✅ Connected as peer for note ${noteId}`);
+          console.log(`[WebRTC Server] ✅ Synced as peer for note ${noteId}`);
         });
 
-        webrtcProvider.on('peers', (event: { webrtcPeers: string[] }) => {
-          console.log(`[WebRTC Server] Note ${noteId}: ${event.webrtcPeers.length} peers`);
+        webrtcProvider.on('peers', (event: { added: string[], removed: string[], webrtcPeers: string[] }) => {
+          console.log(`[WebRTC Server] Note ${noteId}: ${event.webrtcPeers.length} peers connected`);
+          if (event.added.length > 0) {
+            console.log(`[WebRTC Server] ➕ Added peers: ${event.added.join(', ')}`);
+          }
+          if (event.removed.length > 0) {
+            console.log(`[WebRTC Server] ➖ Removed peers: ${event.removed.join(', ')}`);
+          }
+        });
+
+        // Подписываемся на обновления Yjs документа для логирования
+        ydoc.on('update', (update: Uint8Array, origin: any) => {
+          if (origin !== 'server') {
+            console.log(`[WebRTC Server] 📝 Received update for note ${noteId} from ${origin || 'peer'} (${update.length} bytes)`);
+          }
         });
 
         // Сохраняем провайдер
         webrtcProviders.set(noteId, webrtcProvider);
-        console.log(`[WebRTC Server] 🚀 Initialized as peer for note ${noteId}`);
+        console.log(`[WebRTC Server] 🚀 Initialized as peer for note ${noteId}, waiting for connections...`);
       } catch (error) {
         console.error('[WebRTC Server] ❌ Failed to initialize provider:', error);
         // Не критично - сервер продолжит работать через WebSocket

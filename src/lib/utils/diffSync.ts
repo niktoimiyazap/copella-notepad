@@ -66,6 +66,30 @@ export class DiffSyncManager {
   private contentUpdateTimeout: ReturnType<typeof setTimeout> | null = null;
   private isMobile: boolean = isMobileDevice();
   
+  // Throttling для курсоров и awareness (уменьшено для более отзывчивой синхронизации)
+  private cursorThrottle = 16; // ~60 FPS вместо 50ms
+  private awarenessThrottle = 50; // Уменьшено с больших значений
+  private lastCursorUpdate = 0;
+  private lastAwarenessUpdate = 0;
+  private pendingAwarenessUpdate: ReturnType<typeof setTimeout> | null = null;
+  
+  // Сохраненная позиция курсора для дедупликации
+  private lastCursorPosition = -1;
+  private lastCursorSelection: { start: number; end: number } | undefined = undefined;
+  
+  // Батчинг для Yjs updates (уменьшено для более быстрой синхронизации)
+  private UPDATE_BATCH_DELAY = 10; // Уменьшено с больших значений до 10ms
+  private pendingUpdates: Uint8Array[] = [];
+  private updateBatchTimeout: ReturnType<typeof setTimeout> | null = null;
+  
+  // Качество соединения (для индикатора)
+  private connectionQuality: ConnectionQuality = 'excellent';
+  private currentLatency = 0;
+  private latencyHistory: number[] = [];
+  private MAX_LATENCY_HISTORY = 10;
+  private latencyCheckInterval: ReturnType<typeof setInterval> | null = null;
+  private pingStartTime = 0;
+  
 
   // Защита от зацикливания (флаг обновления)
   private updateInProgress = false;
@@ -113,25 +137,54 @@ export class DiffSyncManager {
             signaling: [
               'wss://ws.copella.live/signaling'
             ],
-            // STUN/TURN серверы для NAT traversal
+            // STUN/TURN серверы для NAT traversal (МАКСИМАЛЬНАЯ совместимость)
             peerOpts: {
               config: {
                 iceServers: [
-                  // Google публичные STUN серверы
+                  // Google публичные STUN серверы (множество для надежности)
                   { urls: 'stun:stun.l.google.com:19302' },
                   { urls: 'stun:stun1.l.google.com:19302' },
                   { urls: 'stun:stun2.l.google.com:19302' },
                   { urls: 'stun:stun3.l.google.com:19302' },
-                  { urls: 'stun:stun4.l.google.com:19302' }
-                ]
+                  { urls: 'stun:stun4.l.google.com:19302' },
+                  // Дополнительные публичные STUN серверы для лучшей совместимости
+                  { urls: 'stun:stun.stunprotocol.org:3478' },
+                  { urls: 'stun:stun.voip.blackberry.com:3478' },
+                  // OpenRelay публичный TURN сервер (для прохождения сложных NAT)
+                  {
+                    urls: 'turn:openrelay.metered.ca:80',
+                    username: 'openrelayproject',
+                    credential: 'openrelayproject'
+                  },
+                  {
+                    urls: 'turn:openrelay.metered.ca:443',
+                    username: 'openrelayproject',
+                    credential: 'openrelayproject'
+                  },
+                  {
+                    urls: 'turn:openrelay.metered.ca:443?transport=tcp',
+                    username: 'openrelayproject',
+                    credential: 'openrelayproject'
+                  }
+                ],
+                // Агрессивная стратегия ICE для быстрого подключения
+                iceCandidatePoolSize: 10,
+                iceTransportPolicy: 'all' // Пробуем все: STUN, TURN, host
+              },
+              // Таймауты для быстрого фолбэка
+              channelConfig: {
+                ordered: false, // Неупорядоченная доставка для скорости
+                maxRetransmits: 0 // Без повторов - для скорости
               }
             },
-            // Максимум пиров для P2P (оптимизация для производительности)
-            maxConns: 20
+            // Максимум пиров для P2P
+            maxConns: 20,
+            // Фильтр для выбора лучших пиров
+            filterBcConns: true
           }
         );
 
-        // Отслеживание состояния WebRTC подключения
+        // Отслеживание состояния WebRTC подключения (ДЕТАЛЬНОЕ ЛОГИРОВАНИЕ)
         this.webrtcProvider.on('synced', () => {
           console.log('[WebRTC] ✅ Synced with peers via P2P');
           this.isInitialized = true;
@@ -139,14 +192,31 @@ export class DiffSyncManager {
         });
 
         this.webrtcProvider.on('peers', (event: { added: string[], removed: string[], webrtcPeers: string[] }) => {
-          console.log(`[WebRTC] 🔗 ${event.webrtcPeers.length} peers connected (P2P)`);
+          console.log(`[WebRTC] 🔗 Total peers: ${event.webrtcPeers.length} (P2P)`);
+          
+          if (event.added && event.added.length > 0) {
+            console.log(`[WebRTC] ➕ New peers connected: ${event.added.length}`);
+          }
+          if (event.removed && event.removed.length > 0) {
+            console.log(`[WebRTC] ➖ Peers disconnected: ${event.removed.length}`);
+          }
           
           if (event.webrtcPeers.length > 0) {
             this.onSyncStatus('connected');
+            console.log('[WebRTC] ✅ P2P connection established');
+          } else {
+            console.warn('[WebRTC] ⚠️ No peers connected - waiting for connections...');
           }
         });
+        
+        // Логируем ошибки подключения
+        this.webrtcProvider.on('connection-error', (error: any) => {
+          console.error('[WebRTC] ❌ Connection error:', error);
+        });
 
-        console.log('[WebRTC] 🚀 P2P provider initialized (no WebSocket fallback)');
+        console.log('[WebRTC] 🚀 P2P provider initialized');
+        console.log('[WebRTC] 📡 Signaling server: wss://ws.copella.live/signaling');
+        console.log('[WebRTC] 🔑 Room ID:', `copella-room-${this.roomId}-note-${this.noteId}`);
         
         // Отмечаем как инициализированный сразу
         this.isInitialized = true;
@@ -175,6 +245,9 @@ export class DiffSyncManager {
         if (origin === 'local') {
           return;
         }
+        
+        // Логируем удаленные изменения для отладки
+        console.log(`[Yjs] 📝 Remote content update from ${origin || 'unknown'}`);
         
         // Применяем только удаленные изменения
         const content = this.ytext.toString();
@@ -739,9 +812,9 @@ export class DiffSyncManager {
       clearTimeout(this.contentUpdateTimeout);
     }
     
-    // Увеличенная задержка для лучшего батчинга при быстрой печати
-    // 30ms для desktop (оптимальный баланс), 50ms для mobile
-    const delay = this.isMobile ? 50 : 30;
+    // Минимальная задержка для максимальной отзывчивости
+    // 10ms для desktop (почти real-time), 20ms для mobile
+    const delay = this.isMobile ? 20 : 10;
     
     this.contentUpdateTimeout = setTimeout(() => {
       this.applyContentUpdate();
@@ -839,10 +912,10 @@ export class DiffSyncManager {
       return;
     }
     
-    // Throttling для cursor updates
+    // Минимальный throttling для cursor updates (только для защиты от спама)
     const now = Date.now();
     if (now - this.lastCursorUpdate < this.cursorThrottle) {
-      // Пропускаем обновление из-за throttle
+      // Пропускаем обновление из-за throttle (16ms = ~60 FPS)
       return;
     }
     

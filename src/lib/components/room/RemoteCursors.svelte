@@ -222,8 +222,8 @@
 				
 				if (!target || !current) return;
 				
-				// Коэффициент интерполяции (0.3 = плавное движение)
-				const lerpFactor = 0.3;
+			// Коэффициент интерполяции (0.5 = более быстрое движение, сохраняя плавность)
+			const lerpFactor = 0.5;
 				
 				// Вычисляем новую позицию
 				const newLeft = current.left + (target.left - current.left) * lerpFactor;
@@ -490,8 +490,8 @@
 		opacity: 0.2;
 		pointer-events: none;
 		will-change: transform, width, height;
-		/* Быстрое обновление выделения для real-time синхронизации */
-		transition: transform 30ms linear, width 30ms linear, height 30ms linear, opacity 200ms ease-out;
+		/* Мгновенное обновление выделения для real-time синхронизации (без transition) */
+		transition: opacity 200ms ease-out;
 	}
 </style>
 
