@@ -4,8 +4,7 @@
  */
 
 import { WebSocketServer } from 'ws';
-import * as Y from 'yjs';
-import { setupWSConnection } from 'y-websocket/bin/utils';
+import { setupWSConnection } from '@y/websocket-server/src/utils.js';
 
 const PORT = process.env.YJS_WS_PORT || 1234;
 
@@ -32,18 +31,18 @@ const wss = new WebSocketServer({
 
 console.log(`[Yjs WebSocket] 🚀 Server started on port ${PORT}`);
 
-// Карта документов (для персистентности в памяти)
-const docs = new Map<string, Y.Doc>();
-
 // Обработка подключений
 wss.on('connection', (ws, req) => {
-  console.log('[Yjs WebSocket] New connection');
+  const docName = req.url?.slice(1) || 'default';
+  console.log(`[Yjs] Client connected to doc: ${docName}`);
   
+  // setupWSConnection автоматически:
+  // - Создает/получает Y.Doc
+  // - Настраивает синхронизацию
+  // - Обрабатывает awareness
+  // - Управляет подключениями
   setupWSConnection(ws, req, {
-    // Callback для получения/создания документа
-    docName: req.url?.slice(1) || 'default',
-    
-    // Callback для персистентности (опционально)
+    docName: docName,
     gc: true // Включаем garbage collection для Yjs
   });
 });
