@@ -6,6 +6,7 @@
 	import UserFilters from '$lib/components/users/UserFilters.svelte';
 	import BulkActions from '$lib/components/users/BulkActions.svelte';
 	import UserAnalytics from '$lib/components/users/UserAnalytics.svelte';
+	import PendingApprovals from '$lib/components/PendingApprovals.svelte';
 	import type { User, UserRole } from '$lib/types/user';
 	import { getRoomParticipants, updateParticipantRole, updateParticipantPermissions, removeRoomParticipant } from '$lib/permissions';
 	import { currentUser, userActions } from '$lib/stores/user';
@@ -615,8 +616,7 @@
 			<!-- Заявки на одобрение (если включено requireApproval) -->
 			{#if requireApproval}
 				<div class="approvals-section">
-					<h2 class="section-title">Заявки на вступление</h2>
-					<p class="info-text">Функция заявок будет доступна в следующих обновлениях. Пока используется Yjs для синхронизации.</p>
+					<PendingApprovals roomId={roomId} isOwner={$currentUser?.id === ownerId} />
 				</div>
 			{/if}
 
@@ -809,23 +809,7 @@
 
 	/* Стили для секции заявок */
 	.approvals-section {
-		background: #ffffff;
-		border: 1px solid #dadce0;
-		border-radius: 8px;
-		overflow: hidden;
-		box-shadow: 0 1px 3px rgba(60, 64, 67, 0.3), 0 4px 8px 3px rgba(60, 64, 67, 0.15);
 		margin-bottom: 16px;
-	}
-
-	.approvals-section .section-title {
-		font-family: 'Google Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-		font-weight: 500;
-		font-size: 18px;
-		color: #202124;
-		margin: 0;
-		padding: 16px 20px;
-		background: #f8f9fa;
-		border-bottom: 1px solid #dadce0;
 	}
 
 	.filter-results-info {
