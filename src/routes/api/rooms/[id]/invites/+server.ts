@@ -2,7 +2,6 @@ import { json } from '@sveltejs/kit';
 import { prisma } from '$lib/prisma';
 import { randomBytes } from 'crypto';
 import { performSecurityCheck, checkInviteCreationRateLimit, validateUserAuth } from '$lib/security/inviteSecurity';
-import { notifyInviteCreated, notifyApprovalRequest, notifyInviteAccepted, notifyParticipantUpdate } from '$lib/websocket-notify';
 import type { RequestHandler } from './$types';
 
 // Создание приглашения в комнату
@@ -75,8 +74,7 @@ export const POST: RequestHandler = async ({ request, params, url }) => {
 			}
 		});
 
-		// Отправляем уведомление через WebSocket
-		await notifyInviteCreated(roomId, invite);
+		// Yjs автоматически синхронизирует изменения
 
 		// Возвращаем информацию о приглашении
 		return json({
@@ -269,8 +267,7 @@ export const PUT: RequestHandler = async ({ request, params, url }) => {
 				}
 			});
 
-		// Отправляем уведомление владельцу комнаты через WebSocket
-		await notifyApprovalRequest(roomId, updatedInvite);
+		// Yjs автоматически синхронизирует изменения
 
 			return json({
 				message: 'Application submitted for approval',
@@ -296,9 +293,7 @@ export const PUT: RequestHandler = async ({ request, params, url }) => {
 		});
 	});
 
-		// Отправляем уведомления через WebSocket
-		await notifyInviteAccepted(roomId, invite, user.id);
-		await notifyParticipantUpdate(roomId, { userId: user.id, roomId }, 'joined');
+		// Yjs автоматически синхронизирует изменения
 
 		return json({
 			message: 'Successfully joined the room',

@@ -1,7 +1,6 @@
 import { json } from '@sveltejs/kit';
 import { prisma } from '$lib/prisma';
 import { supabase } from '$lib/supabase';
-import { notifyApprovalResponse, notifyParticipantUpdate } from '$lib/websocket-notify';
 import type { RequestHandler } from './$types';
 
 // Получение всех приглашений для комнаты (только для владельца)
@@ -201,11 +200,7 @@ export const POST: RequestHandler = async ({ request, params }) => {
 			});
 		});
 
-		// Отправляем уведомления через WebSocket
-		if (invite.requestedBy) {
-			await notifyApprovalResponse(roomId, invite.id, 'approved', invite.requestedBy);
-			await notifyParticipantUpdate(roomId, { userId: userIdToAdd, roomId }, 'joined');
-		}
+		// Yjs автоматически синхронизирует изменения
 
 			return json({ message: 'Application approved' });
 		} else if (action === 'reject') {
@@ -215,10 +210,7 @@ export const POST: RequestHandler = async ({ request, params }) => {
 				data: { status: 'declined' }
 			});
 
-		// Отправляем уведомление через WebSocket
-		if (invite.requestedBy) {
-			await notifyApprovalResponse(roomId, invite.id, 'rejected', invite.requestedBy);
-		}
+		// Yjs автоматически синхронизирует изменения
 
 			return json({ message: 'Application rejected' });
 		} else {
@@ -302,11 +294,7 @@ export const DELETE: RequestHandler = async ({ request, params }) => {
 			where: { id: invite.id }
 		});
 
-		// Отправляем уведомление через WebSocket
-		const wsManager = getWebSocketManager();
-		if (wsManager) {
-			wsManager.notifyInviteRevoked(roomId, invite.id);
-		}
+		// Yjs автоматически синхронизирует изменения
 
 		return json({ message: 'Invite revoked' });
 

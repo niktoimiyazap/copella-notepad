@@ -1,27 +1,9 @@
 /**
- * PM2 конфигурация для запуска серверов на VPS
+ * PM2 конфигурация для Yjs WebSocket сервера
  */
 
 module.exports = {
   apps: [
-    {
-      name: 'copella-websocket',
-      script: './server/start-websocket.ts',
-      interpreter: 'node',
-      interpreterArgs: '--import tsx',
-      instances: 1,
-      exec_mode: 'fork',
-      autorestart: true,
-      watch: false,
-      max_memory_restart: '500M',
-      env: {
-        NODE_ENV: 'production',
-        WS_PORT: 3001
-      },
-      error_file: './logs/websocket-error.log',
-      out_file: './logs/websocket-out.log',
-      log_date_format: 'YYYY-MM-DD HH:mm:ss Z'
-    },
     {
       name: 'copella-yjs',
       script: './server/start-yjs-websocket.ts',
