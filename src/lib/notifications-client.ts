@@ -36,13 +36,10 @@ class NotificationsClient {
   private connect() {
     const wsUrl = env.PUBLIC_NOTIFICATIONS_WS_URL || 'ws://localhost:3001';
     
-    console.log('[Notifications] 🔌 Connecting to:', wsUrl);
-    
     try {
       this.ws = new WebSocket(wsUrl);
       
       this.ws.onopen = () => {
-        console.log('[Notifications] ✅ Connected');
         this.reconnectAttempts = 0;
         this.reconnectDelay = 1000;
         
@@ -57,7 +54,6 @@ class NotificationsClient {
           const message = JSON.parse(event.data);
           
           if (message.type === 'subscribed') {
-            console.log('[Notifications] ✅ Subscribed to room:', message.roomId);
             return;
           }
           
@@ -68,17 +64,16 @@ class NotificationsClient {
               try {
                 handler(message);
               } catch (error) {
-                console.error('[Notifications] ❌ Handler error:', error);
+                // Handler error
               }
             });
           }
         } catch (error) {
-          console.error('[Notifications] ❌ Error parsing message:', error);
+          // Error parsing message
         }
       };
       
       this.ws.onclose = () => {
-        console.log('[Notifications] 🔌 Disconnected');
         this.ws = null;
         
         // Автоматическое переподключение (если не было намеренного закрытия)
@@ -86,28 +81,23 @@ class NotificationsClient {
           this.reconnectAttempts++;
           const delay = Math.min(this.reconnectDelay * this.reconnectAttempts, 30000);
           
-          console.log(`[Notifications] 🔄 Reconnecting in ${delay}ms (attempt ${this.reconnectAttempts})`);
-          
           this.reconnectTimer = setTimeout(() => {
             this.connect();
           }, delay);
-        } else if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-          console.error('[Notifications] ❌ Max reconnection attempts reached');
         }
       };
       
       this.ws.onerror = (error) => {
-        console.error('[Notifications] ❌ WebSocket error:', error);
+        // WebSocket error
       };
     } catch (error) {
-      console.error('[Notifications] ❌ Connection error:', error);
+      // Connection error
     }
   }
 
   // Подписка на комнату
   subscribeToRoom(roomId: string) {
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
-      console.warn('[Notifications] ⚠️ WebSocket not connected, will subscribe when connected');
       this.subscribedRooms.add(roomId);
       return;
     }
@@ -118,8 +108,6 @@ class NotificationsClient {
       type: 'subscribe',
       roomId
     }));
-    
-    console.log('[Notifications] 📥 Subscribing to room:', roomId);
   }
 
   // Отписка от комнаты
@@ -134,8 +122,6 @@ class NotificationsClient {
       type: 'unsubscribe',
       roomId
     }));
-    
-    console.log('[Notifications] 📤 Unsubscribing from room:', roomId);
   }
 
   // Добавление обработчика уведомлений
@@ -144,8 +130,6 @@ class NotificationsClient {
       this.handlers.set(type, new Set());
     }
     this.handlers.get(type)!.add(handler);
-    
-    console.log('[Notifications] 🎧 Registered handler for:', type);
   }
 
   // Удаление обработчика
@@ -176,8 +160,6 @@ class NotificationsClient {
     
     this.subscribedRooms.clear();
     this.handlers.clear();
-    
-    console.log('[Notifications] 🛑 Client closed');
   }
 
   // Проверка состояния соединения

@@ -55,13 +55,10 @@ export const PATCH: RequestHandler = async ({ params, request }) => {
 			return json({ error: 'isOnline must be a boolean' }, { status: 400 });
 		}
 
-		console.log(`[Online Status] Updating user ${user.id} in room ${roomId}: ${isOnline}`);
-
 		// Обновляем статус онлайн
 		const result = await updateUserOnlineStatus(user.id, roomId, isOnline);
 
 		if (result.error) {
-			console.error('[Online Status] Error:', result.error);
 			return json({ error: result.error }, { status: 500 });
 		}
 
@@ -82,15 +79,10 @@ export const PATCH: RequestHandler = async ({ params, request }) => {
 					timestamp: Date.now()
 				})
 			});
-			
-			if (!response.ok) {
-				console.error('[Online Status] Failed to broadcast notification');
-			}
 		} catch (error) {
-			console.error('[Online Status] Error broadcasting notification:', error);
+			// Error broadcasting notification
 		}
 
-		console.log(`[Online Status] ✅ User ${user.id} status updated: ${isOnline}`);
 		return json({ success: true });
 	} catch (error) {
 		console.error('Error updating online status:', error);

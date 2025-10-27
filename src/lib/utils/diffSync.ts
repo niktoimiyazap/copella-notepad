@@ -90,7 +90,6 @@ export class DiffSyncManager {
       this.indexeddbProvider = new IndexeddbPersistence(`copella-note-${this.noteId}`, this.ydoc);
       
       this.indexeddbProvider.once('synced', () => {
-        console.log('[IndexedDB] ✅ Loaded from cache');
         // Сразу показываем cached контент
         const content = this.ytext.toString();
         if (content) {
@@ -111,9 +110,6 @@ export class DiffSyncManager {
         // Формируем полный WebSocket URL
         // y-websocket ожидает полный URL вида: ws://host:port/roomName
         const fullWsUrl = `${wsBaseUrl}/${roomName}`;
-        
-        console.log('[WebSocket] 🚀 Connecting to:', fullWsUrl);
-        console.log('[WebSocket] 🔑 Room:', roomName);
         
         this.wsProvider = new WebsocketProvider(
           wsBaseUrl.replace(/^wss?:\/\//, ''), // Хост без протокола для y-websocket
@@ -143,8 +139,6 @@ export class DiffSyncManager {
 
         // Обработчики событий
         this.wsProvider.on('status', ({ status }: { status: string }) => {
-          console.log('[WebSocket] Status:', status);
-          
           if (status === 'connected') {
             this.isInitialized = true;
             this.onSyncStatus('connected');
@@ -155,7 +149,6 @@ export class DiffSyncManager {
 
         this.wsProvider.on('sync', (isSynced: boolean) => {
           if (isSynced) {
-            console.log('[WebSocket] ✅ Synced with server');
             this.isInitialized = true;
             this.onSyncStatus('connected');
           }
@@ -177,7 +170,6 @@ export class DiffSyncManager {
         });
 
       } catch (error) {
-        console.error('[WebSocket] ❌ Failed to initialize:', error);
         this.onSyncStatus('error');
       }
     }
@@ -198,9 +190,6 @@ export class DiffSyncManager {
       if (origin === 'local') {
         return;
       }
-      
-      // Удаленные изменения
-      console.log('[Yjs] 📝 Remote update');
       
       this.onSyncStatus('syncing');
       
@@ -419,7 +408,5 @@ export class DiffSyncManager {
     this.ydoc.destroy();
     
     this.remoteCursors.clear();
-    
-    console.log('[DiffSync] 🔌 Destroyed');
   }
 }

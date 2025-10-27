@@ -152,7 +152,6 @@
 			
 			// Слушаем обновления участников
 			const handleParticipantUpdate = (data: any) => {
-				console.log('[Online Status] Participant update:', data);
 				// Перезагружаем список участников
 				reloadParticipants();
 			};
@@ -209,14 +208,8 @@
 				},
 				body: JSON.stringify({ isOnline })
 			});
-
-			if (!response.ok) {
-				console.error('[Online Status] Failed to update:', await response.text());
-			} else {
-				console.log(`[Online Status] ✅ Updated to ${isOnline}`);
-			}
 		} catch (error) {
-			console.error('[Online Status] Error:', error);
+			// Error updating online status
 		}
 	}
 
@@ -253,12 +246,11 @@
 		openSingleUserWidget(roomId, participant.userId, {
 			targetElement: event,
 			onUpdate: (updatedUser) => {
-				console.log('User updated:', updatedUser);
 				// Перезагружаем участников комнаты
 				reloadParticipants();
 			},
 			onClose: () => {
-				console.log('User management widget closed');
+				// Widget closed
 			}
 		});
 	}

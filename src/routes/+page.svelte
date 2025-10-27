@@ -27,7 +27,6 @@
 		// Проверяем авторизацию на клиенте
 		const token = localStorage.getItem('session_token');
 		if (!token) {
-			console.log('[Home] No session token, redirecting to login');
 			goto('/auth/login');
 			return;
 		}
@@ -51,13 +50,10 @@
 				const data = await response.json();
 				if (data.user) {
 					userActions.setUser(data.user);
-					console.log('[Home] User data loaded:', data.user.username);
 				}
-			} else {
-				console.error('[Home] Failed to load user data');
 			}
 		} catch (error) {
-			console.error('[Home] Error loading user data:', error);
+			// Error loading user data
 		}
 	}
 

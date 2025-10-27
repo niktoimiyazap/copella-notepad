@@ -17,15 +17,10 @@ async function sendNotification(notification: NotificationMessage) {
       },
       body: JSON.stringify(notification),
     }).catch(() => {
-      // Если HTTP API недоступен, просто логируем
-      console.log('[Notifications] Server not available, notification not sent:', notification);
+      // HTTP API недоступен
     });
-    
-    if (response && !response.ok) {
-      console.error('[Notifications] Failed to send notification:', response.statusText);
-    }
   } catch (error) {
-    console.error('[Notifications] Error sending notification:', error);
+    // Error sending notification
   }
 }
 
