@@ -424,13 +424,18 @@ export const DELETE: RequestHandler = async ({ params, request, cookies }) => {
 
 	// Отправляем WebSocket уведомление удаленному пользователю
 	try {
-		const response = await fetch('http://localhost:3001/notify', {
+		const WS_SERVER_URL = process.env.WS_SERVER_URL || 'http://localhost:3001';
+		const response = await fetch(`${WS_SERVER_URL}/broadcast`, {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({
-				type: 'participant_removed',
+				type: 'participant:update',
 				roomId,
-				userId
+				data: {
+					userId,
+					removed: true
+				},
+				timestamp: Date.now()
 			})
 		});
 		
