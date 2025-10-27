@@ -111,18 +111,24 @@ export class DiffSyncManager {
     // WebSocket провайдер для синхронизации
     if (typeof window !== 'undefined') {
       try {
-        // URL WebSocket сервера
+        // URL WebSocket сервера (должен быть ПОЛНЫЙ URL с протоколом!)
         const wsBaseUrl = env.PUBLIC_WS_URL || 'ws://localhost:1234';
         
         // Уникальная комната для каждой заметки
         const roomName = `copella-room-${this.roomId}-note-${this.noteId}`;
         
-        // y-websocket формирует URL как: `${protocol}://${serverUrl}/${roomName}`
-        // Нам нужно передать serverUrl БЕЗ протокола и БЕЗ слеша в конце
-        const serverUrl = wsBaseUrl.replace(/^wss?:\/\//, '').replace(/\/$/, '');
+        // ВАЖНО: serverUrl ДОЛЖЕН содержать протокол (ws:// или wss://)
+        // Иначе браузер воспринимает его как относительный путь!
+        // y-websocket формирует финальный URL как: serverUrl + '/' + roomName
+        let serverUrl = wsBaseUrl;
+        
+        // Убеждаемся что URL НЕ заканчивается на слеш (y-websocket добавит его сам)
+        if (serverUrl.endsWith('/')) {
+          serverUrl = serverUrl.slice(0, -1);
+        }
         
         this.wsProvider = new WebsocketProvider(
-          serverUrl, // Хост без протокола (ws.copella.live или localhost:1234)
+          serverUrl, // ПОЛНЫЙ URL с протоколом: wss://ws.copella.live или ws://localhost:1234
           roomName,  // Имя комнаты (будет добавлено как /{roomName})
           this.ydoc,
           {
