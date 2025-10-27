@@ -325,20 +325,23 @@
 										<div class="border border-gray-200 rounded-lg p-4">
 											<div class="flex items-center justify-between">
 												<div class="flex items-center space-x-3">
-													{#if invite.inviter.avatarUrl}
+													{#if invite.requester?.avatarUrl}
 														<img 
-															src={invite.inviter.avatarUrl} 
-															alt={invite.inviter.fullName}
+															src={invite.requester.avatarUrl} 
+															alt={invite.requester.fullName}
 															class="w-10 h-10 rounded-full"
 														/>
 													{:else}
 														<div class="w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center text-white font-bold">
-															{invite.inviter.fullName.charAt(0).toUpperCase()}
+															{invite.requester?.fullName?.charAt(0)?.toUpperCase() || '?'}
 														</div>
 													{/if}
 													<div>
-														<p class="font-medium text-gray-900">{invite.inviter.fullName}</p>
-														<p class="text-sm text-gray-600">@{invite.inviter.username}</p>
+														<p class="font-medium text-gray-900">{invite.requester?.fullName || 'Неизвестный пользователь'}</p>
+														<p class="text-sm text-gray-600">@{invite.requester?.username || 'unknown'}</p>
+														{#if invite.requester?.email}
+															<p class="text-xs text-gray-500">{invite.requester.email}</p>
+														{/if}
 														<p class="text-xs text-gray-500">{formatDate(invite.createdAt)}</p>
 													</div>
 												</div>

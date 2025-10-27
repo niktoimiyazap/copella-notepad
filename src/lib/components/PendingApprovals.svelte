@@ -2,6 +2,8 @@
 	import { onMount, onDestroy } from 'svelte';
 	import { getNotificationsClient } from '$lib/notifications-client';
 	import type { NotificationMessage } from '$lib/notifications-client';
+	import { getPendingApprovals, approveRequest, rejectRequest } from '$lib/approvals';
+	import type { PendingApproval } from '$lib/approvals';
 	
 	interface Props {
 		roomId: string;
@@ -10,8 +12,10 @@
 
 	let { roomId, isOwner }: Props = $props();
 
-	let pendingApprovals = $state<any[]>([]);
+	let pendingApprovals = $state<PendingApproval[]>([]);
 	let notificationsClient: ReturnType<typeof getNotificationsClient> | null = null;
+	let loading = $state(false);
+	let error = $state<string | null>(null);
 
 	onMount(async () => {
 		// Загружаем pending approvals
@@ -39,14 +43,21 @@
 	});
 
 	async function loadPendingApprovals() {
+		loading = true;
+		error = null;
 		try {
-			const response = await fetch(`/api/rooms/${roomId}/invites/manage`);
-			if (response.ok) {
-				const data = await response.json();
-				pendingApprovals = data.pendingInvites || [];
+			const result = await getPendingApprovals(roomId);
+			if (result.error) {
+				error = result.error;
+				console.error('[PendingApprovals] Error loading:', result.error);
+			} else {
+				pendingApprovals = result.approvals || [];
 			}
-		} catch (error) {
-			console.error('[PendingApprovals] Error loading:', error);
+		} catch (err) {
+			error = 'Неожиданная ошибка';
+			console.error('[PendingApprovals] Error loading:', err);
+		} finally {
+			loading = false;
 		}
 	}
 
@@ -58,62 +69,71 @@
 
 	async function handleApprove(inviteId: string) {
 		try {
-			const response = await fetch(`/api/rooms/${roomId}/invites/manage`, {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ inviteId, action: 'approve' })
-			});
-
-			if (response.ok) {
+			const result = await approveRequest(roomId, inviteId);
+			if (result.error) {
+				console.error('[PendingApprovals] Error approving:', result.error);
+				alert(result.error);
+			} else {
 				// Удаляем из списка
 				pendingApprovals = pendingApprovals.filter(inv => inv.id !== inviteId);
 			}
-		} catch (error) {
-			console.error('[PendingApprovals] Error approving:', error);
+		} catch (err) {
+			console.error('[PendingApprovals] Error approving:', err);
 		}
 	}
 
 	async function handleReject(inviteId: string) {
 		try {
-			const response = await fetch(`/api/rooms/${roomId}/invites/manage`, {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ inviteId, action: 'reject' })
-			});
-
-			if (response.ok) {
+			const result = await rejectRequest(roomId, inviteId);
+			if (result.error) {
+				console.error('[PendingApprovals] Error rejecting:', result.error);
+				alert(result.error);
+			} else {
 				// Удаляем из списка
 				pendingApprovals = pendingApprovals.filter(inv => inv.id !== inviteId);
 			}
-		} catch (error) {
-			console.error('[PendingApprovals] Error rejecting:', error);
+		} catch (err) {
+			console.error('[PendingApprovals] Error rejecting:', err);
 		}
 	}
 </script>
 
-{#if isOwner && pendingApprovals.length > 0}
-<div class="pending-approvals">
-		<h3>Pending Approvals ({pendingApprovals.length})</h3>
-		<div class="approvals-list">
-			{#each pendingApprovals as approval}
-				<div class="approval-item">
-					<div class="approval-info">
-						<strong>{approval.requester?.username || approval.requester?.fullName || 'Unknown'}</strong>
-						<span class="approval-email">{approval.requester?.email || ''}</span>
-					</div>
-					<div class="approval-actions">
-						<button class="btn-approve" onclick={() => handleApprove(approval.id)}>
-							Approve
-						</button>
-						<button class="btn-reject" onclick={() => handleReject(approval.id)}>
-							Reject
-						</button>
-					</div>
-				</div>
-			{/each}
+{#if isOwner}
+	{#if loading}
+		<div class="pending-approvals">
+			<p class="loading-text">Загрузка заявок...</p>
 		</div>
+	{:else if error}
+		<div class="pending-approvals">
+			<p class="error-text">Ошибка: {error}</p>
+			<button class="btn-retry" onclick={() => loadPendingApprovals()}>
+				Повторить
+			</button>
+		</div>
+	{:else if pendingApprovals.length > 0}
+		<div class="pending-approvals">
+			<h3>Заявки на вступление ({pendingApprovals.length})</h3>
+			<div class="approvals-list">
+				{#each pendingApprovals as approval}
+					<div class="approval-item">
+						<div class="approval-info">
+							<strong>{approval.requester?.username || approval.requester?.fullName || 'Unknown'}</strong>
+							<span class="approval-email">{approval.requester?.email || ''}</span>
+						</div>
+						<div class="approval-actions">
+							<button class="btn-approve" onclick={() => handleApprove(approval.id)}>
+								Одобрить
+							</button>
+							<button class="btn-reject" onclick={() => handleReject(approval.id)}>
+								Отклонить
+							</button>
+						</div>
+					</div>
+				{/each}
+			</div>
 		</div>
 	{/if}
+{/if}
 
 <style>
 	.pending-approvals {
@@ -191,6 +211,34 @@
 
 	.btn-reject:hover {
 		background: #d63636;
+	}
+
+	.loading-text {
+		color: #888;
+		font-size: 14px;
+		text-align: center;
+		margin: 0;
+	}
+
+	.error-text {
+		color: #ff4444;
+		font-size: 14px;
+		margin: 0 0 12px 0;
+	}
+
+	.btn-retry {
+		background: #4A9EFF;
+		color: white;
+		padding: 8px 16px;
+		border-radius: 4px;
+		border: none;
+		font-size: 13px;
+		cursor: pointer;
+		transition: all 0.2s;
+	}
+
+	.btn-retry:hover {
+		background: #3b7fd6;
 	}
 </style>
 
