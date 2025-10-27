@@ -64,16 +64,17 @@ export class DiffSyncManager {
     '#E67E22', '#16A085', '#27AE60', '#2980B9', '#8E44AD'
   ];
   
-  // Throttling для курсоров
+  // Throttling для курсоров (оптимизировано для 3G)
   private lastCursorUpdate = 0;
-  private cursorThrottle = 16; // ~60 FPS
+  private cursorThrottle = 150; // Снижено до ~7 FPS для 3G
   
   // Защита от зацикливания
   private updateInProgress = false;
   
-  // Дебоунсинг для контента
+  // Дебоунсинг для контента (оптимизировано для 3G)
   private contentUpdateTimeout: ReturnType<typeof setTimeout> | null = null;
   private pendingContent: string | null = null;
+  private contentDebounce = 200; // Увеличено до 200мс для 3G
 
   constructor(options: DiffSyncOptions) {
     this.noteId = options.noteId;
@@ -295,8 +296,8 @@ export class DiffSyncManager {
       return;
     }
     
-    // Дебоунсинг: откладываем обновление на 50мс
-    // Это уменьшает количество операций при быстром наборе
+    // Дебоунсинг: откладываем обновление для экономии трафика на 3G
+    // Это существенно уменьшает количество операций при быстром наборе
     if (this.contentUpdateTimeout) {
       clearTimeout(this.contentUpdateTimeout);
     }
@@ -305,7 +306,7 @@ export class DiffSyncManager {
     
     this.contentUpdateTimeout = setTimeout(() => {
       this.applyContentUpdate();
-    }, 50);
+    }, this.contentDebounce);
   }
   
   /**

@@ -9,8 +9,26 @@ import { setupWSConnection } from 'y-websocket/bin/utils';
 
 const PORT = process.env.YJS_WS_PORT || 1234;
 
-// Создаем WebSocket сервер
-const wss = new WebSocketServer({ port: Number(PORT) });
+// Создаем WebSocket сервер с оптимизацией для медленных соединений
+const wss = new WebSocketServer({ 
+  port: Number(PORT),
+  // Включаем сжатие для экономии трафика на 3G
+  perMessageDeflate: {
+    zlibDeflateOptions: {
+      chunkSize: 1024,
+      memLevel: 7,
+      level: 3 // Умеренное сжатие для баланса между скоростью и размером
+    },
+    zlibInflateOptions: {
+      chunkSize: 10 * 1024
+    },
+    clientNoContextTakeover: true,
+    serverNoContextTakeover: true,
+    serverMaxWindowBits: 10,
+    concurrencyLimit: 10,
+    threshold: 1024 // Сжимаем сообщения больше 1KB
+  }
+});
 
 console.log(`[Yjs WebSocket] 🚀 Server started on port ${PORT}`);
 
