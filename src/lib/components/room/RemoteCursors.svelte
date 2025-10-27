@@ -1,7 +1,6 @@
 <script lang="ts">
 	import { onDestroy } from 'svelte';
-	import type { CursorInfo, ConnectionQuality } from '../../utils/diffSync';
-	import { Wifi, WifiOff } from '@lucide/svelte';
+	import type { CursorInfo } from '../../utils/diffSync';
 
 	interface Props {
 		cursors: Map<string, CursorInfo>;
@@ -9,61 +8,6 @@
 	}
 
 	let { cursors, editorElement = $bindable(null) }: Props = $props();
-	
-	/**
-	 * Получение иконки для качества соединения
-	 */
-	function getConnectionIcon(quality?: ConnectionQuality) {
-		switch (quality) {
-			case 'excellent':
-			case 'good':
-				return Wifi;
-			case 'poor':
-			case 'offline':
-				return WifiOff;
-			default:
-				return Wifi;
-		}
-	}
-	
-	/**
-	 * Получение цвета для качества соединения
-	 */
-	function getConnectionColor(quality?: ConnectionQuality) {
-		switch (quality) {
-			case 'excellent':
-				return '#52B788'; // зеленый
-			case 'good':
-				return '#FFA07A'; // оранжевый
-			case 'poor':
-				return '#FF6B6B'; // красный
-			case 'offline':
-				return '#666'; // серый
-			default:
-				return '#52B788';
-		}
-	}
-	
-	/**
-	 * Получение текста для качества соединения
-	 */
-	function getConnectionText(quality?: ConnectionQuality, latency?: number) {
-		if (latency !== undefined && latency >= 0) {
-			return `${Math.round(latency)}ms`;
-		}
-		switch (quality) {
-			case 'excellent':
-				return 'Отлично';
-			case 'good':
-				return 'Хорошо';
-			case 'poor':
-				return 'Плохо';
-			case 'offline':
-				return 'Офлайн';
-			default:
-				return '';
-		}
-	}
 
 	let cursorElements = new Map<string, HTMLElement>();
 	let animationFrame: number | null = null;
@@ -369,16 +313,6 @@
 				<div class="cursor-line"></div>
 				<div class="cursor-flag">
 					<span class="cursor-flag-name">{cursor.username || 'Пользователь'}</span>
-					{#if cursor.connectionQuality}
-						{@const Icon = getConnectionIcon(cursor.connectionQuality)}
-						<span 
-							class="cursor-flag-connection"
-							style="color: {getConnectionColor(cursor.connectionQuality)}"
-							title="{getConnectionText(cursor.connectionQuality, cursor.latency)}"
-						>
-							<Icon size={12} />
-						</span>
-					{/if}
 				</div>
 			</div>
 			
@@ -443,19 +377,10 @@
 		border-radius: 4px;
 		white-space: nowrap;
 		box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-		display: flex;
-		align-items: center;
-		gap: 4px;
 	}
 	
 	.cursor-flag-name {
 		display: inline-block;
-	}
-	
-	.cursor-flag-connection {
-		display: inline-flex;
-		align-items: center;
-		opacity: 0.9;
 	}
 
 	@keyframes cursor-blink {
