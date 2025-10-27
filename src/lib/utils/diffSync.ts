@@ -117,13 +117,13 @@ export class DiffSyncManager {
         // Уникальная комната для каждой заметки
         const roomName = `copella-room-${this.roomId}-note-${this.noteId}`;
         
-        // Формируем полный WebSocket URL
-        // y-websocket ожидает полный URL вида: ws://host:port/roomName
-        const fullWsUrl = `${wsBaseUrl}/${roomName}`;
+        // y-websocket формирует URL как: `${protocol}://${serverUrl}/${roomName}`
+        // Нам нужно передать serverUrl БЕЗ протокола и БЕЗ слеша в конце
+        const serverUrl = wsBaseUrl.replace(/^wss?:\/\//, '').replace(/\/$/, '');
         
         this.wsProvider = new WebsocketProvider(
-          wsBaseUrl.replace(/^wss?:\/\//, ''), // Хост без протокола для y-websocket
-          roomName,
+          serverUrl, // Хост без протокола (ws.copella.live или localhost:1234)
+          roomName,  // Имя комнаты (будет добавлено как /{roomName})
           this.ydoc,
           {
             // Параметры подключения
@@ -132,16 +132,6 @@ export class DiffSyncManager {
             params: {
               // Опционально: можно передавать token для авторизации
             },
-            // Используем wss:// для secure connection
-            WebSocketPolyfill: class extends WebSocket {
-              constructor(url: string) {
-                // Заменяем относительный URL на абсолютный
-                const absoluteUrl = url.startsWith('ws://') || url.startsWith('wss://') 
-                  ? url 
-                  : `${wsBaseUrl}/${url}`;
-                super(absoluteUrl);
-              }
-            } as any,
             // Максимум переподключений
             maxBackoffTime: 5000,
           }
