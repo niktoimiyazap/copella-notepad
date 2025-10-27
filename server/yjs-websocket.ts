@@ -4,7 +4,8 @@
  */
 
 import { WebSocketServer } from 'ws';
-import { setupWSConnection } from '@y/websocket-server/src/utils.js';
+// Импортируем setupWSConnection из @y/websocket-server (новый пакет)
+import { setupWSConnection } from '@y/websocket-server/utils';
 
 const PORT = process.env.YJS_WS_PORT || 1234;
 
