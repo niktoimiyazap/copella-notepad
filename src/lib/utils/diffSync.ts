@@ -103,19 +103,20 @@ export class DiffSyncManager {
     if (typeof window !== 'undefined') {
       try {
         // URL WebSocket сервера
-        const wsUrl = env.PUBLIC_WS_URL || 'ws://localhost:1234';
-        // Убираем протокол для y-websocket (он добавляет сам)
-        const wsHost = wsUrl.replace(/^wss?:\/\//, '');
-        const useSecure = wsUrl.startsWith('wss://');
+        const wsBaseUrl = env.PUBLIC_WS_URL || 'ws://localhost:1234';
         
         // Уникальная комната для каждой заметки
         const roomName = `copella-room-${this.roomId}-note-${this.noteId}`;
         
-        console.log('[WebSocket] 🚀 Connecting to:', wsHost);
+        // Формируем полный WebSocket URL
+        // y-websocket ожидает полный URL вида: ws://host:port/roomName
+        const fullWsUrl = `${wsBaseUrl}/${roomName}`;
+        
+        console.log('[WebSocket] 🚀 Connecting to:', fullWsUrl);
         console.log('[WebSocket] 🔑 Room:', roomName);
         
         this.wsProvider = new WebsocketProvider(
-          wsHost,
+          wsBaseUrl.replace(/^wss?:\/\//, ''), // Хост без протокола для y-websocket
           roomName,
           this.ydoc,
           {
@@ -125,8 +126,16 @@ export class DiffSyncManager {
             params: {
               // Опционально: можно передавать token для авторизации
             },
-            // Используем wss:// если URL начинается с wss://
-            WebSocketPolyfill: useSecure ? undefined : undefined,
+            // Используем wss:// для secure connection
+            WebSocketPolyfill: class extends WebSocket {
+              constructor(url: string) {
+                // Заменяем относительный URL на абсолютный
+                const absoluteUrl = url.startsWith('ws://') || url.startsWith('wss://') 
+                  ? url 
+                  : `${wsBaseUrl}/${url}`;
+                super(absoluteUrl);
+              }
+            } as any,
             // Максимум переподключений
             maxBackoffTime: 5000,
           }
