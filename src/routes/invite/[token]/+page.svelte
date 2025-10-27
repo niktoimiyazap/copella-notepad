@@ -4,7 +4,6 @@
 	import { goto } from '$app/navigation';
 	import { currentUser, authState } from '$lib/stores/user';
 	import { fetchCurrentUser, getAuthToken } from '$lib/api/userApi';
-	import { websocketClient } from '$lib/websocket';
 
 	// Получаем токен приглашения из параметров маршрута
 	const inviteToken = $derived($page.params.token);
@@ -83,10 +82,7 @@
 	});
 
 	onDestroy(() => {
-		// Удаляем обработчик при уничтожении компонента
-		if (websocketClient && wsConnected) {
-			websocketClient.offMessage('approval_response', handleApprovalResponse);
-		}
+		// Cleanup
 	});
 
 	async function loadInviteInfo() {
@@ -163,39 +159,7 @@
 				showSuccess = true;
 				isWaitingApproval = true;
 				isProcessing = false;
-				
-				// Подключаемся к WebSocket глобально чтобы получить уведомление об одобрении
-				// WebSocket подключится без присоединения к комнате
-				try {
-					console.log('[Invite] Setting up WebSocket connection...');
-					if (websocketClient) {
-						// Подписываемся на ВСЕ сообщения для отладки
-						websocketClient.onMessage('*', (message) => {
-							console.log('[Invite] Received WebSocket message (all):', message);
-						});
-						
-						// Подписываемся на ответ об одобрении ПЕРЕД подключением
-						console.log('[Invite] Subscribing to approval_response events...');
-						websocketClient.onMessage('approval_response', handleApprovalResponse);
-						
-						// Подключаемся к WebSocket
-						console.log('[Invite] Connecting to WebSocket globally...');
-						const connected = await websocketClient.connectGlobal();
-						console.log('[Invite] WebSocket connection result:', connected);
-						
-						if (connected) {
-							wsConnected = true;
-							console.log('[Invite] Successfully connected to WebSocket and subscribed to approval_response events');
-						} else {
-							console.error('[Invite] Failed to connect to WebSocket');
-						}
-					} else {
-						console.error('[Invite] websocketClient is not available');
-					}
-				} catch (wsError) {
-					console.error('[Invite] Error setting up WebSocket:', wsError);
-					// Не показываем ошибку пользователю, он все равно может обновить страницу
-				}
+				// Yjs автоматически синхронизирует статус одобрения
 			} else {
 				// Переходим в комнату сразу
 				goto(`/room/${inviteData.room.id}`);
