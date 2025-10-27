@@ -70,6 +70,10 @@ export class DiffSyncManager {
   
   // Защита от зацикливания
   private updateInProgress = false;
+  
+  // Дебоунсинг для контента
+  private contentUpdateTimeout: ReturnType<typeof setTimeout> | null = null;
+  private pendingContent: string | null = null;
 
   constructor(options: DiffSyncOptions) {
     this.noteId = options.noteId;
@@ -191,16 +195,19 @@ export class DiffSyncManager {
         return;
       }
       
+      // ОПТИМИЗАЦИЯ: Применяем удаленные изменения немедленно без задержек
+      // Yjs CRDT гарантирует правильное разрешение конфликтов
       this.onSyncStatus('syncing');
       
       const content = this.ytext.toString();
       this.onContentUpdate(content);
       
+      // Быстрее возвращаемся в статус connected (50мс вместо 100мс)
       setTimeout(() => {
         if (this.isActive) {
           this.onSyncStatus('connected');
         }
-      }, 100);
+      }, 50);
       
       // Обновляем курсоры после изменения документа
       this.handleAwarenessChange();
@@ -276,9 +283,39 @@ export class DiffSyncManager {
 
   /**
    * Обновление контента (когда пользователь печатает)
+   * КЛЮЧЕВОЕ ИСПРАВЛЕНИЕ: Вычисляем дельты вместо замены всего текста
    */
   public updateContent(newContent: string) {
     if (!this.isActive || this.updateInProgress) return;
+    
+    const currentContent = this.ytext.toString();
+    
+    // Игнорируем если контент не изменился
+    if (newContent === currentContent) {
+      return;
+    }
+    
+    // Дебоунсинг: откладываем обновление на 50мс
+    // Это уменьшает количество операций при быстром наборе
+    if (this.contentUpdateTimeout) {
+      clearTimeout(this.contentUpdateTimeout);
+    }
+    
+    this.pendingContent = newContent;
+    
+    this.contentUpdateTimeout = setTimeout(() => {
+      this.applyContentUpdate();
+    }, 50);
+  }
+  
+  /**
+   * Применение обновления контента с вычислением дельт
+   */
+  private applyContentUpdate() {
+    if (!this.isActive || this.updateInProgress || !this.pendingContent) return;
+    
+    const newContent = this.pendingContent;
+    this.pendingContent = null;
     
     const currentContent = this.ytext.toString();
     
@@ -292,11 +329,23 @@ export class DiffSyncManager {
     try {
       this.onSyncStatus('syncing');
       
-      // Простое обновление: удаляем все и вставляем новое
-      this.ydoc.transact(() => {
-        this.ytext.delete(0, this.ytext.length);
-        this.ytext.insert(0, newContent);
-      }, 'local');
+      // КЛЮЧЕВОЕ ИСПРАВЛЕНИЕ: Вычисляем минимальные изменения вместо замены всего текста
+      // Это позволяет Yjs CRDT правильно разрешать конфликты при одновременном редактировании
+      
+      const delta = this.computeTextDelta(currentContent, newContent);
+      
+      if (delta.length > 0) {
+        this.ydoc.transact(() => {
+          // Применяем все дельты в одной транзакции
+          for (const op of delta) {
+            if (op.type === 'delete') {
+              this.ytext.delete(op.index, op.length);
+            } else if (op.type === 'insert') {
+              this.ytext.insert(op.index, op.text);
+            }
+          }
+        }, 'local');
+      }
       
       setTimeout(() => {
         if (this.isActive) {
@@ -306,6 +355,55 @@ export class DiffSyncManager {
     } finally {
       this.updateInProgress = false;
     }
+  }
+  
+  /**
+   * Вычисление минимальных изменений между двумя строками
+   * Использует простой алгоритм diff
+   */
+  private computeTextDelta(oldText: string, newText: string): Array<{type: 'insert' | 'delete', index: number, length?: number, text?: string}> {
+    const operations: Array<{type: 'insert' | 'delete', index: number, length?: number, text?: string}> = [];
+    
+    // Находим общий префикс
+    let prefixLength = 0;
+    while (prefixLength < oldText.length && prefixLength < newText.length && oldText[prefixLength] === newText[prefixLength]) {
+      prefixLength++;
+    }
+    
+    // Находим общий суффикс
+    let suffixLength = 0;
+    while (
+      suffixLength < oldText.length - prefixLength && 
+      suffixLength < newText.length - prefixLength && 
+      oldText[oldText.length - 1 - suffixLength] === newText[newText.length - 1 - suffixLength]
+    ) {
+      suffixLength++;
+    }
+    
+    // Середина - это то что изменилось
+    const oldMiddle = oldText.substring(prefixLength, oldText.length - suffixLength);
+    const newMiddle = newText.substring(prefixLength, newText.length - suffixLength);
+    
+    // Если середина изменилась, создаем операции
+    if (oldMiddle.length > 0) {
+      // Удаляем старую середину
+      operations.push({
+        type: 'delete',
+        index: prefixLength,
+        length: oldMiddle.length
+      });
+    }
+    
+    if (newMiddle.length > 0) {
+      // Вставляем новую середину
+      operations.push({
+        type: 'insert',
+        index: prefixLength,
+        text: newMiddle
+      });
+    }
+    
+    return operations;
   }
 
   /**
@@ -387,6 +485,12 @@ export class DiffSyncManager {
   public destroy() {
     this.isActive = false;
     
+    // Очищаем таймеры
+    if (this.contentUpdateTimeout) {
+      clearTimeout(this.contentUpdateTimeout);
+      this.contentUpdateTimeout = null;
+    }
+    
     // Убираем локальное состояние awareness
     if (this.wsProvider) {
       this.wsProvider.awareness.setLocalState(null);
@@ -408,5 +512,6 @@ export class DiffSyncManager {
     this.ydoc.destroy();
     
     this.remoteCursors.clear();
+    this.pendingContent = null;
   }
 }
