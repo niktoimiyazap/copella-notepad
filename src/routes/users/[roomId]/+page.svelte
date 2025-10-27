@@ -6,7 +6,6 @@
 	import UserFilters from '$lib/components/users/UserFilters.svelte';
 	import BulkActions from '$lib/components/users/BulkActions.svelte';
 	import UserAnalytics from '$lib/components/users/UserAnalytics.svelte';
-	import PendingApprovals from '$lib/components/PendingApprovals.svelte';
 	import type { User, UserRole } from '$lib/types/user';
 	import { getRoomParticipants, updateParticipantRole, updateParticipantPermissions, removeRoomParticipant } from '$lib/permissions';
 	import { currentUser, userActions } from '$lib/stores/user';
@@ -617,7 +616,7 @@
 			{#if requireApproval}
 				<div class="approvals-section">
 					<h2 class="section-title">Заявки на вступление</h2>
-					<PendingApprovals roomId={roomId} />
+					<p class="info-text">Функция заявок будет доступна в следующих обновлениях. Пока используется Yjs для синхронизации.</p>
 				</div>
 			{/if}
 

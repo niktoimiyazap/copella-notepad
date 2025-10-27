@@ -12,5 +12,3 @@ export * from './home';
 // Import Header directly: import Header from '$lib/components/layout/header/Header.svelte';
 export * from './ui/modals';
 export * from './room';
-export { default as PendingApprovals } from './PendingApprovals.svelte';
-export { default as OnlineUsers } from './OnlineUsers.svelte';
