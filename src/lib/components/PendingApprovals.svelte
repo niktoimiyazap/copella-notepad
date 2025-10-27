@@ -137,17 +137,20 @@
 
 <style>
 	.pending-approvals {
-		background: #1a1a1a;
-		border: 1px solid #2a2a2a;
+		background: #ffffff;
+		border: 1px solid #dadce0;
 		border-radius: 8px;
-		padding: 16px;
+		padding: 20px;
 		margin-bottom: 24px;
+		box-shadow: 0 1px 3px rgba(60, 64, 67, 0.3), 0 4px 8px 3px rgba(60, 64, 67, 0.15);
 	}
 
 	h3 {
 		margin: 0 0 16px 0;
-		font-size: 16px;
-		color: #ffffff;
+		font-size: 18px;
+		color: #202124;
+		font-family: 'Google Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+		font-weight: 500;
 	}
 	
 	.approvals-list {
@@ -160,9 +163,10 @@
 		display: flex;
 		justify-content: space-between;
 		align-items: center;
-		padding: 12px;
-		background: #0f0f0f;
-		border-radius: 6px;
+		padding: 16px;
+		background: #f8f9fa;
+		border: 1px solid #e8eaed;
+		border-radius: 8px;
 	}
 
 	.approval-info {
@@ -172,13 +176,16 @@
 	}
 
 	.approval-info strong {
-		color: #ffffff;
+		color: #202124;
 		font-size: 14px;
+		font-weight: 500;
+		font-family: 'Google Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 	}
 
 	.approval-email {
-		color: #888;
-		font-size: 12px;
+		color: #5f6368;
+		font-size: 13px;
+		font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 	}
 
 	.approval-actions {
@@ -187,58 +194,67 @@
 	}
 	
 	button {
-		padding: 6px 12px;
+		padding: 8px 16px;
 		border-radius: 4px;
 		border: none;
-		font-size: 13px;
+		font-size: 14px;
+		font-weight: 500;
 		cursor: pointer;
 		transition: all 0.2s;
+		font-family: 'Google Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 	}
 
 	.btn-approve {
-		background: #4A9EFF;
+		background: #1a73e8;
 		color: white;
 	}
 
 	.btn-approve:hover {
-		background: #3b7fd6;
+		background: #1557b0;
+		box-shadow: 0 1px 2px 0 rgba(60, 64, 67, 0.3), 0 1px 3px 1px rgba(60, 64, 67, 0.15);
 	}
 
 	.btn-reject {
-		background: #ff4444;
+		background: #d93025;
 		color: white;
 	}
 
 	.btn-reject:hover {
-		background: #d63636;
+		background: #b52d20;
+		box-shadow: 0 1px 2px 0 rgba(60, 64, 67, 0.3), 0 1px 3px 1px rgba(60, 64, 67, 0.15);
 	}
 
 	.loading-text {
-		color: #888;
+		color: #5f6368;
 		font-size: 14px;
 		text-align: center;
 		margin: 0;
+		font-family: 'Google Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 	}
 
 	.error-text {
-		color: #ff4444;
+		color: #d93025;
 		font-size: 14px;
 		margin: 0 0 12px 0;
+		font-family: 'Google Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 	}
 
 	.btn-retry {
-		background: #4A9EFF;
+		background: #1a73e8;
 		color: white;
 		padding: 8px 16px;
 		border-radius: 4px;
 		border: none;
-		font-size: 13px;
+		font-size: 14px;
+		font-weight: 500;
 		cursor: pointer;
 		transition: all 0.2s;
+		font-family: 'Google Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 	}
 
 	.btn-retry:hover {
-		background: #3b7fd6;
+		background: #1557b0;
+		box-shadow: 0 1px 2px 0 rgba(60, 64, 67, 0.3), 0 1px 3px 1px rgba(60, 64, 67, 0.15);
 	}
 </style>
 
