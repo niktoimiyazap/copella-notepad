@@ -10,7 +10,6 @@
 		type ActiveFormats
 	} from '../../utils/formatting';
 	import { DiffSyncManager, type CursorInfo } from '../../utils/diffSync';
-	import { useWebSocket } from '../../websocket';
 	import { applyIncrementalUpdate } from '../../utils/domDiff';
 	import { currentUser } from '../../stores/user';
 	
