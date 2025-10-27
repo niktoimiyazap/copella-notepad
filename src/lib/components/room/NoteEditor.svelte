@@ -699,14 +699,14 @@
 	}
 	
 	function handleMouseMove() {
-		// Обновляем позицию курсора только если идёт выделение (оптимизировано для 3G)
+		// Обновляем позицию курсора только если идёт выделение
 		if (isMouseDown && !mouseMoveThrottleTimeout) {
 			updateCursorPosition(true); // immediate = true для мгновенного обновления
 			
-			// Throttle увеличен до 200мс для экономии трафика на медленном соединении
+			// Умеренный throttle для баланса между UX и трафиком
 			mouseMoveThrottleTimeout = setTimeout(() => {
 				mouseMoveThrottleTimeout = null;
-			}, 200);
+			}, 100);
 		}
 	}
 	

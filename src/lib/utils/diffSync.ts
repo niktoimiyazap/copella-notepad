@@ -64,17 +64,22 @@ export class DiffSyncManager {
     '#E67E22', '#16A085', '#27AE60', '#2980B9', '#8E44AD'
   ];
   
-  // Throttling для курсоров (оптимизировано для 3G)
+  // Адаптивная оптимизация в зависимости от качества соединения
   private lastCursorUpdate = 0;
-  private cursorThrottle = 150; // Снижено до ~7 FPS для 3G
+  private cursorThrottle = 50; // Динамически меняется
   
   // Защита от зацикливания
   private updateInProgress = false;
   
-  // Дебоунсинг для контента (оптимизировано для 3G)
+  // Дебоунсинг для контента (адаптивный)
   private contentUpdateTimeout: ReturnType<typeof setTimeout> | null = null;
   private pendingContent: string | null = null;
-  private contentDebounce = 200; // Увеличено до 200мс для 3G
+  private contentDebounce = 80; // Динамически меняется
+  
+  // Определение качества соединения
+  private connectionQuality: ConnectionQuality = 'good';
+  private latencyHistory: number[] = [];
+  private lastSyncTime = 0;
 
   constructor(options: DiffSyncOptions) {
     this.noteId = options.noteId;
@@ -166,7 +171,8 @@ export class DiffSyncManager {
           username: this.username || 'User',
           avatarUrl: this.avatarUrl,
           color: userColor,
-          noteId: this.noteId
+          noteId: this.noteId,
+          connectionQuality: this.connectionQuality
         });
 
         // Слушаем изменения awareness (курсоры других пользователей)
@@ -196,6 +202,9 @@ export class DiffSyncManager {
         return;
       }
       
+      // Измеряем latency для адаптации
+      this.measureLatency();
+      
       // ОПТИМИЗАЦИЯ: Применяем удаленные изменения немедленно без задержек
       // Yjs CRDT гарантирует правильное разрешение конфликтов
       this.onSyncStatus('syncing');
@@ -216,6 +225,61 @@ export class DiffSyncManager {
     
     // Отмечаем как инициализированный
     this.isInitialized = true;
+  }
+
+  /**
+   * Измерение latency и адаптация throttle/debounce
+   */
+  private measureLatency() {
+    const now = Date.now();
+    if (this.lastSyncTime > 0) {
+      const latency = now - this.lastSyncTime;
+      this.latencyHistory.push(latency);
+      
+      // Храним только последние 10 измерений
+      if (this.latencyHistory.length > 10) {
+        this.latencyHistory.shift();
+      }
+      
+      // Вычисляем средний latency
+      const avgLatency = this.latencyHistory.reduce((a, b) => a + b, 0) / this.latencyHistory.length;
+      
+      // Определяем качество соединения и адаптируем параметры
+      let newQuality: ConnectionQuality;
+      if (avgLatency < 100) {
+        // Отличное соединение (WiFi, 4G+)
+        newQuality = 'excellent';
+        this.contentDebounce = 50;
+        this.cursorThrottle = 30;
+      } else if (avgLatency < 300) {
+        // Хорошее соединение (хороший 4G, 3G+)
+        newQuality = 'good';
+        this.contentDebounce = 80;
+        this.cursorThrottle = 50;
+      } else if (avgLatency < 800) {
+        // Слабое соединение (3G)
+        newQuality = 'poor';
+        this.contentDebounce = 150;
+        this.cursorThrottle = 100;
+      } else {
+        // Очень слабое соединение (2G, Edge)
+        newQuality = 'offline';
+        this.contentDebounce = 300;
+        this.cursorThrottle = 200;
+      }
+      
+      // Обновляем качество соединения в awareness если изменилось
+      if (newQuality !== this.connectionQuality) {
+        this.connectionQuality = newQuality;
+        if (this.wsProvider) {
+          this.wsProvider.awareness.setLocalStateField('user', {
+            ...this.wsProvider.awareness.getLocalState()?.user,
+            connectionQuality: this.connectionQuality
+          });
+        }
+      }
+    }
+    this.lastSyncTime = now;
   }
 
   /**
@@ -251,7 +315,8 @@ export class DiffSyncManager {
         selection: cursor.selection,
         color: user.color,
         timestamp: Date.now(),
-        noteId: this.noteId
+        noteId: this.noteId,
+        connectionQuality: user.connectionQuality || 'good'
       });
     });
     

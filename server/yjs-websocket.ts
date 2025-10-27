@@ -9,24 +9,24 @@ import { setupWSConnection } from 'y-websocket/bin/utils';
 
 const PORT = process.env.YJS_WS_PORT || 1234;
 
-// Создаем WebSocket сервер с оптимизацией для медленных соединений
+// Создаем WebSocket сервер с адаптивным сжатием
 const wss = new WebSocketServer({ 
   port: Number(PORT),
-  // Включаем сжатие для экономии трафика на 3G
+  // Включаем агрессивное сжатие для текстовых данных (Yjs отлично сжимается)
   perMessageDeflate: {
     zlibDeflateOptions: {
       chunkSize: 1024,
-      memLevel: 7,
-      level: 3 // Умеренное сжатие для баланса между скоростью и размером
+      memLevel: 8,
+      level: 6 // Более сильное сжатие (текст сжимается отлично)
     },
     zlibInflateOptions: {
       chunkSize: 10 * 1024
     },
     clientNoContextTakeover: true,
     serverNoContextTakeover: true,
-    serverMaxWindowBits: 10,
+    serverMaxWindowBits: 15, // Максимальный размер окна для лучшего сжатия
     concurrencyLimit: 10,
-    threshold: 1024 // Сжимаем сообщения больше 1KB
+    threshold: 256 // Сжимаем даже небольшие сообщения (256 байт)
   }
 });
 
