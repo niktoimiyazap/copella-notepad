@@ -13,7 +13,6 @@
 	import { getRoomNotes, type Note } from '$lib/notes';
 	import { getRoomParticipants, getUserRoomPermissions } from '$lib/permissions';
 	import { getRoom, updateRoom, type Room } from '$lib/rooms';
-	import { initParticipantsOnlineTracking } from '$lib/utils/participantsOnlineStatus';
 	import { openSingleUserWidget } from '$lib/api/user-management';
 
 	// Получаем ID комнаты из параметров маршрута
@@ -155,20 +154,7 @@
 					disconnectOnlineTracking();
 				}
 				
-				try {
-					// Ждем подключения к WebSocket и получения начальных данных
-					disconnectOnlineTracking = await initParticipantsOnlineTracking(
-						roomId,
-						$currentUser.id,
-						() => roomData.participants as any[],
-						(updatedParticipants) => {
-							roomData.participants = updatedParticipants as Participant[];
-						}
-					);
-				} catch (wsError) {
-					console.error('WebSocket connection error:', wsError);
-					// Продолжаем работу даже если WebSocket не подключился
-					// (пользователь сможет работать с комнатой, но без real-time обновлений)
+			// Yjs автоматически обрабатывает онлайн статусы участников
 				}
 			} else {
 				console.log('[Room] User is not a participant, skipping WebSocket connection');
@@ -465,19 +451,7 @@
 					disconnectOnlineTracking();
 				}
 				
-				try {
-					// Ждем подключения к WebSocket и получения начальных данных
-					disconnectOnlineTracking = await initParticipantsOnlineTracking(
-						roomId,
-						$currentUser.id,
-						() => roomData.participants as any[],
-						(updatedParticipants) => {
-							roomData.participants = updatedParticipants as Participant[];
-						}
-					);
-				} catch (wsError) {
-					console.error('WebSocket reconnection error:', wsError);
-					// Продолжаем работу даже если WebSocket не подключился
+			// Yjs автоматически обрабатывает онлайн статусы участников
 				}
 			} else {
 				console.log('[Room] User is not a participant, skipping WebSocket reconnection');
