@@ -1,37 +1,42 @@
+/**
+ * PM2 конфигурация для запуска серверов на VPS
+ */
+
 module.exports = {
   apps: [
     {
       name: 'copella-websocket',
-      script: 'server/start-websocket.ts',
+      script: './server/start-websocket.ts',
       interpreter: 'node',
-      interpreter_args: '--import tsx',
+      interpreterArgs: '--import tsx',
       instances: 1,
-      exec_mode: 'fork',
+      autorestart: true,
       watch: false,
       max_memory_restart: '500M',
       env: {
-        NODE_ENV: 'production'
+        NODE_ENV: 'production',
+        WS_PORT: 3001
       },
-      error_file: '~/.pm2/logs/copella-websocket-error.log',
-      out_file: '~/.pm2/logs/copella-websocket-out.log',
+      error_file: './logs/websocket-error.log',
+      out_file: './logs/websocket-out.log',
       log_date_format: 'YYYY-MM-DD HH:mm:ss Z'
     },
     {
-      name: 'copella-signaling',
-      script: 'server/start-signaling.ts',
+      name: 'copella-yjs',
+      script: './server/start-yjs-websocket.ts',
       interpreter: 'node',
-      interpreter_args: '--import tsx',
+      interpreterArgs: '--import tsx',
       instances: 1,
-      exec_mode: 'fork',
+      autorestart: true,
       watch: false,
-      max_memory_restart: '300M',
+      max_memory_restart: '500M',
       env: {
-        NODE_ENV: 'production'
+        NODE_ENV: 'production',
+        YJS_WS_PORT: 1234
       },
-      error_file: '~/.pm2/logs/copella-signaling-error.log',
-      out_file: '~/.pm2/logs/copella-signaling-out.log',
+      error_file: './logs/yjs-error.log',
+      out_file: './logs/yjs-out.log',
       log_date_format: 'YYYY-MM-DD HH:mm:ss Z'
     }
   ]
 };
-

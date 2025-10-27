@@ -6,10 +6,10 @@
 	"scripts": {
 		"dev": "vite dev",
 		"dev:ws": "tsx server/start-websocket.ts",
-		"dev:signaling": "tsx server/start-signaling.ts",
-		"dev:all": "concurrently \"npm run dev\" \"npm run dev:ws\" \"npm run dev:signaling\"",
+		"dev:yjs": "tsx server/start-yjs-websocket.ts",
+		"dev:all": "concurrently \"npm run dev\" \"npm run dev:yjs\"",
 		"start:ws": "node --import tsx server/start-websocket.ts",
-		"start:signaling": "node --import tsx server/start-signaling.ts",
+		"start:yjs": "node --import tsx server/start-yjs-websocket.ts",
 		"build": "vite build",
 		"preview": "vite preview",
 		"prepare": "svelte-kit sync || echo ''",
@@ -50,6 +50,7 @@
 		"y-indexeddb": "^9.0.12",
 		"y-protocols": "^1.0.6",
 		"y-webrtc": "^10.3.0",
+		"y-websocket": "^3.0.0",
 		"yjs": "^13.6.27",
 		"zod": "^4.1.12"
 	}

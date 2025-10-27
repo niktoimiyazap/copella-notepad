@@ -117,6 +117,9 @@
 			diffSyncManager = new DiffSyncManager({
 				noteId: currentNoteId,
 				roomId: roomId,
+				userId: $currentUser?.id || 'unknown',
+				username: $currentUser?.username || $currentUser?.email || 'User',
+				avatarUrl: $currentUser?.avatarUrl,
 				onContentUpdate: (newContent) => {
 					// Применяем обновление только если есть реальная разница
 					if (!editorElement) return;
@@ -600,13 +603,10 @@
 						}
 					}
 					
-					// Передаем информацию о текущем пользователе в updateCursor
+					// Обновляем позицию курсора
 					diffSyncManager?.updateCursor(
 						position,
-						selectionInfo,
-						$currentUser?.id,
-						$currentUser?.username || $currentUser?.email,
-						$currentUser?.avatarUrl
+						selectionInfo
 					);
 				}
 			} catch (error) {
