@@ -14,6 +14,7 @@
 	import { getRoomParticipants, getUserRoomPermissions } from '$lib/permissions';
 	import { getRoom, updateRoom, type Room } from '$lib/rooms';
 	import { openSingleUserWidget } from '$lib/api/user-management';
+	import { getNotificationsClient } from '$lib/notifications-client';
 
 	// Получаем ID комнаты из параметров маршрута
 	const roomId = $derived($page.params.id);
@@ -141,8 +142,29 @@
 				roomData.notes = notes;
 			}
 
-		// Инициализируем отслеживание онлайн статуса участников
-		// Yjs автоматически обрабатывает онлайн статусы участников
+		// Обновляем онлайн статус при входе в комнату
+		if ($currentUser?.id) {
+			await updateOnlineStatus(true);
+			
+			// Подписываемся на WebSocket уведомления для обновления онлайн статуса
+			const notificationsClient = getNotificationsClient();
+			notificationsClient.subscribeToRoom(roomId);
+			
+			// Слушаем обновления участников
+			const handleParticipantUpdate = (data: any) => {
+				console.log('[Online Status] Participant update:', data);
+				// Перезагружаем список участников
+				reloadParticipants();
+			};
+			
+			notificationsClient.on('participant:update', handleParticipantUpdate);
+			
+			// Сохраняем функцию отключения
+			disconnectOnlineTracking = () => {
+				notificationsClient.off('participant:update', handleParticipantUpdate);
+				notificationsClient.unsubscribeFromRoom(roomId);
+			};
+		}
 
 			// Скрываем загрузку после подключения к WebSocket
 			showLoading = false;
@@ -162,11 +184,41 @@
 	});
 
 	// Отключаемся от WebSocket при размонтировании компонента
-	onDestroy(() => {
+	onDestroy(async () => {
+		// Обновляем онлайн статус при выходе из комнаты
+		if ($currentUser?.id && roomId) {
+			await updateOnlineStatus(false);
+		}
+		
 		if (disconnectOnlineTracking) {
 			disconnectOnlineTracking();
 		}
 	});
+
+	// Функция обновления онлайн статуса
+	async function updateOnlineStatus(isOnline: boolean) {
+		try {
+			const token = localStorage.getItem('session_token');
+			if (!token || !roomId) return;
+
+			const response = await fetch(`/api/rooms/${roomId}/online-status`, {
+				method: 'PATCH',
+				headers: {
+					'Authorization': `Bearer ${token}`,
+					'Content-Type': 'application/json'
+				},
+				body: JSON.stringify({ isOnline })
+			});
+
+			if (!response.ok) {
+				console.error('[Online Status] Failed to update:', await response.text());
+			} else {
+				console.log(`[Online Status] ✅ Updated to ${isOnline}`);
+			}
+		} catch (error) {
+			console.error('[Online Status] Error:', error);
+		}
+	}
 
 	function handleShareRoom() {
 		// TODO: Implement room sharing logic
