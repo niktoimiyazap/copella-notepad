@@ -3,6 +3,7 @@ import { prisma } from '$lib/prisma';
 import { randomBytes } from 'crypto';
 import { performSecurityCheck, checkInviteCreationRateLimit, validateUserAuth } from '$lib/security/inviteSecurity';
 import type { RequestHandler } from './$types';
+import { notifyInviteCreated, notifyApprovalRequest, notifyInviteAccepted, notifyParticipantUpdate } from '$lib/server/notifications';
 
 // Создание приглашения в комнату
 export const POST: RequestHandler = async ({ request, params, url }) => {
@@ -74,7 +75,27 @@ export const POST: RequestHandler = async ({ request, params, url }) => {
 			}
 		});
 
-		// Yjs автоматически синхронизирует изменения
+		// Проверяем, требуется ли одобрение владельца
+		const room = await prisma.room.findUnique({
+			where: { id: roomId },
+			select: { requiresApproval: true }
+		});
+		const requiresApproval = room?.requiresApproval || false;
+
+		// Отправляем уведомление о новом приглашении
+		await notifyInviteCreated(roomId, {
+			inviteId: invite.id,
+			invitedBy: user.username || user.fullName || 'Unknown',
+			requiresApproval
+		});
+
+		// Если требуется одобрение, отправляем уведомление владельцу
+		if (requiresApproval) {
+			await notifyApprovalRequest(roomId, {
+				inviteId: invite.id,
+				requestedBy: user.username || user.fullName || 'Unknown'
+			});
+		}
 
 		// Возвращаем информацию о приглашении
 		return json({
@@ -267,7 +288,12 @@ export const PUT: RequestHandler = async ({ request, params, url }) => {
 				}
 			});
 
-		// Yjs автоматически синхронизирует изменения
+		// Отправляем уведомление владельцу о запросе на одобрение
+		await notifyApprovalRequest(roomId, {
+			inviteId: updatedInvite.id,
+			requestedBy: updatedInvite.requester?.username || updatedInvite.requester?.fullName || 'Unknown',
+			requesterEmail: updatedInvite.requester?.email
+		});
 
 			return json({
 				message: 'Application submitted for approval',
@@ -293,7 +319,24 @@ export const PUT: RequestHandler = async ({ request, params, url }) => {
 		});
 	});
 
-		// Yjs автоматически синхронизирует изменения
+	// Получаем добавленного участника для уведомления
+	const newParticipant = await prisma.roomParticipant.findFirst({
+		where: { roomId, userId: user.id },
+		include: { user: true }
+	});
+
+	if (newParticipant) {
+		// Отправляем уведомления
+		await notifyInviteAccepted(roomId, {
+			inviteId: invite.id,
+			participant: newParticipant
+		});
+
+		await notifyParticipantUpdate(roomId, {
+			action: 'joined',
+			participant: newParticipant
+		});
+	}
 
 		return json({
 			message: 'Successfully joined the room',

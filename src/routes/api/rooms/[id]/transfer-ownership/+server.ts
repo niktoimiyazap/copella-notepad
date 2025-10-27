@@ -2,6 +2,7 @@ import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { prisma } from '$lib/prisma';
 import { getCurrentUserFromToken } from '$lib/utils/userManagement';
+import { notifyOwnershipTransfer, notifyParticipantUpdate } from '$lib/server/notifications';
 
 // POST /api/rooms/[id]/transfer-ownership - передать права владельца другому пользователю
 export const POST: RequestHandler = async ({ params, request, cookies }) => {
@@ -125,9 +126,23 @@ export const POST: RequestHandler = async ({ params, request, cookies }) => {
 				}
 			});
 
-			// Yjs автоматически синхронизирует изменения
+			// Отправляем уведомления
+			const oldOwnerData = updatedParticipants.find(p => p.userId === user.id);
+			const newOwnerData = updatedParticipants.find(p => p.userId === newOwnerId);
 
-			console.log(`[Transfer Ownership] WebSocket notification sent for room ${roomId}`);
+			await notifyOwnershipTransfer(roomId, {
+				fromUserId: user.id,
+				toUserId: newOwnerId,
+				oldOwner: oldOwnerData,
+				newOwner: newOwnerData
+			});
+
+			await notifyParticipantUpdate(roomId, {
+				action: 'ownership_transfer',
+				participants: [oldOwnerData, newOwnerData]
+			});
+
+			console.log(`[Transfer Ownership] Notifications sent for room ${roomId}`);
 		} catch (wsError) {
 			console.error('[Transfer Ownership] Failed to send WebSocket notification:', wsError);
 			// Не прерываем выполнение, если WebSocket не работает

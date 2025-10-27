@@ -2,6 +2,7 @@ import { json } from '@sveltejs/kit';
 import { prisma } from '$lib/prisma';
 import { supabase } from '$lib/supabase';
 import type { RequestHandler } from './$types';
+import { notifyApprovalResponse, notifyParticipantUpdate } from '$lib/server/notifications';
 
 // Получение всех приглашений для комнаты (только для владельца)
 export const GET: RequestHandler = async ({ request, params }) => {
@@ -200,7 +201,25 @@ export const POST: RequestHandler = async ({ request, params }) => {
 			});
 		});
 
-		// Yjs автоматически синхронизирует изменения
+		// Отправляем уведомления
+		const addedParticipant = await prisma.roomParticipant.findFirst({
+			where: { roomId, userId: userIdToAdd },
+			include: { user: true }
+		});
+
+		if (addedParticipant) {
+			await notifyApprovalResponse(roomId, {
+				inviteId: invite.id,
+				userId: userIdToAdd,
+				approved: true,
+				participant: addedParticipant
+			});
+
+			await notifyParticipantUpdate(roomId, {
+				action: 'approved',
+				participant: addedParticipant
+			});
+		}
 
 			return json({ message: 'Application approved' });
 		} else if (action === 'reject') {
@@ -210,7 +229,12 @@ export const POST: RequestHandler = async ({ request, params }) => {
 				data: { status: 'declined' }
 			});
 
-		// Yjs автоматически синхронизирует изменения
+		// Отправляем уведомление об отклонении
+		await notifyApprovalResponse(roomId, {
+			inviteId: invite.id,
+			userId: invite.userId || '',
+			approved: false
+		});
 
 			return json({ message: 'Application rejected' });
 		} else {
