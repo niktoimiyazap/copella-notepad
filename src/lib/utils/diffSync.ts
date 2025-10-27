@@ -247,11 +247,22 @@ export class DiffSyncManager {
         }
         
         // Логируем удаленные изменения для отладки
-        console.log(`[Yjs] 📝 Remote content update from ${origin || 'unknown'}`);
+        const originStr = typeof origin === 'string' ? origin : (origin?.constructor?.name || 'peer');
+        console.log(`[Yjs] 📝 Remote content update from ${originStr}`);
+        
+        // Показываем статус синхронизации
+        this.onSyncStatus('syncing');
         
         // Применяем только удаленные изменения
         const content = this.ytext.toString();
         this.onContentUpdate(content);
+        
+        // Быстро возвращаем статус в connected
+        setTimeout(() => {
+          if (this.isActive) {
+            this.onSyncStatus('connected');
+          }
+        }, 100);
         
         // КЛЮЧЕВОЕ ИСПРАВЛЕНИЕ: Обновляем курсоры после изменения документа
         // Это пересчитает абсолютные позиции из относительных
@@ -862,6 +873,9 @@ export class DiffSyncManager {
     this.updateInProgress = true;
     
     try {
+      // Показываем статус синхронизации
+      this.onSyncStatus('syncing');
+      
       // Применяем изменения только к изменённой части
       // transact группирует операции для оптимальной производительности
       this.ydoc.transact(() => {
@@ -878,6 +892,13 @@ export class DiffSyncManager {
       
       // Yjs автоматически генерирует update event, который отправится на сервер
       // через обработчик ydoc.on('update') в конструкторе
+      
+      // Быстро возвращаем статус в connected (P2P синхронизация мгновенная)
+      setTimeout(() => {
+        if (this.isActive) {
+          this.onSyncStatus('connected');
+        }
+      }, 150);
     } finally {
       // Снимаем флаг обновления
       this.updateInProgress = false;
