@@ -21,16 +21,129 @@ const docs = new Map<string, WSSharedDoc>();
 const messageSync = 0;
 const messageAwareness = 1;
 
+// Батчинг для оптимизации broadcast'а
+interface PendingBroadcast {
+  encoder: encoding.Encoder;
+  messageType: number;
+  excludeWs?: any;
+}
+
 class WSSharedDoc extends Y.Doc {
   name: string;
   conns: Map<any, Set<number>>;
   awareness: awarenessProtocol.Awareness;
+  
+  // Батчинг обновлений для производительности
+  pendingBroadcasts: PendingBroadcast[] = [];
+  broadcastTimeout: NodeJS.Timeout | null = null;
+  
+  // Счетчики для статистики
+  messagesQueued = 0;
+  messagesSent = 0;
 
   constructor(name: string) {
     super();
     this.name = name;
     this.conns = new Map();
     this.awareness = new awarenessProtocol.Awareness(this);
+    
+    // Подписываемся на awareness changes для батчинга
+    this.awareness.on('update', ({ added, updated, removed }: any, origin: any) => {
+      const changedClients = added.concat(updated).concat(removed);
+      const awarenessEncoder = encoding.createEncoder();
+      encoding.writeVarUint(awarenessEncoder, messageAwareness);
+      encoding.writeVarUint8Array(
+        awarenessEncoder,
+        awarenessProtocol.encodeAwarenessUpdate(this.awareness, changedClients)
+      );
+      
+      // Добавляем в очередь для батч-отправки
+      this.queueBroadcast({
+        encoder: awarenessEncoder,
+        messageType: messageAwareness,
+        excludeWs: origin
+      });
+    });
+  }
+  
+  /**
+   * Добавляет сообщение в очередь для батч-отправки
+   * Отправка произойдет через 5мс или при накоплении 10 сообщений
+   */
+  queueBroadcast(broadcast: PendingBroadcast) {
+    this.pendingBroadcasts.push(broadcast);
+    this.messagesQueued++;
+    
+    // Если накопилось много сообщений - отправляем немедленно
+    if (this.pendingBroadcasts.length >= 10) {
+      this.flushBroadcasts();
+      return;
+    }
+    
+    // Иначе ждем 5мс для батчинга (меньше чем раньше!)
+    if (this.broadcastTimeout) {
+      clearTimeout(this.broadcastTimeout);
+    }
+    
+    this.broadcastTimeout = setTimeout(() => {
+      this.flushBroadcasts();
+    }, 5); // 5мс вместо немедленной отправки
+  }
+  
+  /**
+   * Отправляет все накопленные сообщения всем клиентам
+   * Использует оптимизированный batch broadcast
+   */
+  flushBroadcasts() {
+    if (this.pendingBroadcasts.length === 0) return;
+    
+    const broadcasts = this.pendingBroadcasts;
+    this.pendingBroadcasts = [];
+    this.broadcastTimeout = null;
+    
+    // Группируем по типу сообщений для оптимизации
+    const syncBroadcasts: PendingBroadcast[] = [];
+    const awarenessBroadcasts: PendingBroadcast[] = [];
+    
+    broadcasts.forEach(b => {
+      if (b.messageType === messageSync) {
+        syncBroadcasts.push(b);
+      } else {
+        awarenessBroadcasts.push(b);
+      }
+    });
+    
+    // Отправляем sync сообщения (приоритет!)
+    syncBroadcasts.forEach(broadcast => {
+      this.broadcastMessage(broadcast.encoder, broadcast.excludeWs);
+    });
+    
+    // Отправляем awareness сообщения
+    awarenessBroadcasts.forEach(broadcast => {
+      this.broadcastMessage(broadcast.encoder, broadcast.excludeWs);
+    });
+    
+    this.messagesSent += broadcasts.length;
+  }
+  
+  /**
+   * Отправляет сообщение всем подключенным клиентам (кроме excludeWs)
+   */
+  broadcastMessage(encoder: encoding.Encoder, excludeWs?: any) {
+    const message = encoding.toUint8Array(encoder);
+    
+    // Оптимизированная рассылка: преобразуем в Buffer один раз
+    const buffer = Buffer.from(message);
+    
+    this.conns.forEach((_, ws) => {
+      if (ws !== excludeWs && ws.readyState === 1) { // 1 = OPEN
+        try {
+          ws.send(buffer, { binary: true });
+        } catch (err) {
+          console.error('[Yjs] Error broadcasting to client:', err);
+        }
+      }
+    });
   }
 }
 
@@ -104,6 +217,26 @@ wss.on('connection', async (ws: any, req) => {
   syncProtocol.writeSyncStep1(encoder, doc);
   ws.send(encoding.toUint8Array(encoder));
   
+  // Подписываемся на обновления документа для рассылки другим клиентам
+  const updateHandler = (update: Uint8Array, origin: any) => {
+    // Не рассылаем обновления если они пришли от нас (избегаем циклов)
+    if (origin === ws) return;
+    
+    // Создаем sync message с обновлением
+    const encoder = encoding.createEncoder();
+    encoding.writeVarUint(encoder, messageSync);
+    syncProtocol.writeSyncStep2(encoder, update);
+    
+    // Добавляем в очередь для батч-отправки
+    doc.queueBroadcast({
+      encoder,
+      messageType: messageSync,
+      excludeWs: origin
+    });
+  };
+  
+  doc.on('update', updateHandler);
+  
   // Обработка сообщений
   ws.on('message', (message: ArrayBuffer) => {
     try {
@@ -115,11 +248,15 @@ wss.on('connection', async (ws: any, req) => {
           const responseEncoder = encoding.createEncoder();
           encoding.writeVarUint(responseEncoder, messageSync);
           syncProtocol.readSyncMessage(decoder, responseEncoder, doc, ws);
+          
           if (encoding.length(responseEncoder) > 1) {
-            ws.send(encoding.toUint8Array(responseEncoder));
+            // Отправляем ответ отправителю немедленно
+            ws.send(encoding.toUint8Array(responseEncoder), { binary: true });
           }
           break;
+          
         case messageAwareness:
+          // Awareness обновления обрабатываются автоматически через подписку в конструкторе
           awarenessProtocol.applyAwarenessUpdate(doc.awareness, decoding.readVarUint8Array(decoder), ws);
           break;
       }
@@ -129,9 +266,15 @@ wss.on('connection', async (ws: any, req) => {
   });
   
   ws.on('close', () => {
+    // Отписываемся от обновлений документа
+    doc.off('update', updateHandler);
+    
     doc.conns.delete(ws);
     awarenessProtocol.removeAwarenessStates(doc.awareness, Array.from(doc.conns.keys()), ws);
     console.log(`[Yjs] Client disconnected from note: ${noteId}`);
+    
+    // Немедленно отправляем оставшиеся сообщения при отключении клиента
+    doc.flushBroadcasts();
   });
 });
 

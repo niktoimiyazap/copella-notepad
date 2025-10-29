@@ -66,7 +66,7 @@ export class DiffSyncManager {
   
   // Адаптивная оптимизация в зависимости от качества соединения
   private lastCursorUpdate = 0;
-  private cursorThrottle = 50; // Динамически меняется
+  private cursorThrottle = 30; // Уменьшено с 50 до 30мс для более быстрого отклика
   
   // Защита от зацикливания
   private updateInProgress = false;
@@ -74,7 +74,7 @@ export class DiffSyncManager {
   // Дебоунсинг для контента (адаптивный)
   private contentUpdateTimeout: ReturnType<typeof setTimeout> | null = null;
   private pendingContent: string | null = null;
-  private contentDebounce = 80; // Динамически меняется
+  private contentDebounce = 20; // Уменьшено с 80 до 20мс для более быстрого ввода!
   
   // Определение качества соединения
   private connectionQuality: ConnectionQuality = 'good';
@@ -132,14 +132,18 @@ export class DiffSyncManager {
           roomName,  // Имя комнаты (будет добавлено как /{roomName})
           this.ydoc,
           {
-            // Параметры подключения
+            // Параметры подключения для максимальной производительности
             connect: true,
             awareness: this.ydoc.awareness,
             params: {
               // Опционально: можно передавать token для авторизации
             },
-            // Максимум переподключений
-            maxBackoffTime: 5000,
+            // Быстрое переподключение (уменьшено с 5000 до 2500мс)
+            maxBackoffTime: 2500,
+            // Быстрое восстановление соединения
+            resyncInterval: 3000,
+            // Отключаем дополнительные задержки для максимальной скорости
+            disableBc: true, // Отключаем BroadcastChannel (дублирование через tabs)
           }
         );
 
@@ -208,12 +212,12 @@ export class DiffSyncManager {
       const content = this.ytext.toString();
       this.onContentUpdate(content);
       
-      // Быстрее возвращаемся в статус connected (50мс вместо 100мс)
+      // Быстрее возвращаемся в статус connected (20мс для минимальной задержки UI)
       setTimeout(() => {
         if (this.isActive) {
           this.onSyncStatus('connected');
         }
-      }, 50);
+      }, 20);
       
       // Обновляем курсоры после изменения документа
       this.handleAwarenessChange();
@@ -243,25 +247,25 @@ export class DiffSyncManager {
       // Определяем качество соединения и адаптируем параметры
       let newQuality: ConnectionQuality;
       if (avgLatency < 100) {
-        // Отличное соединение (WiFi, 4G+)
+        // Отличное соединение (WiFi, 4G+) - максимальная скорость!
         newQuality = 'excellent';
-        this.contentDebounce = 50;
-        this.cursorThrottle = 30;
+        this.contentDebounce = 10; // Супер быстрый ввод!
+        this.cursorThrottle = 20;
       } else if (avgLatency < 300) {
         // Хорошее соединение (хороший 4G, 3G+)
         newQuality = 'good';
-        this.contentDebounce = 80;
-        this.cursorThrottle = 50;
+        this.contentDebounce = 20; // Быстрый ввод
+        this.cursorThrottle = 30;
       } else if (avgLatency < 800) {
         // Слабое соединение (3G)
         newQuality = 'poor';
-        this.contentDebounce = 150;
-        this.cursorThrottle = 100;
+        this.contentDebounce = 100; // Увеличиваем для экономии трафика
+        this.cursorThrottle = 80;
       } else {
         // Очень слабое соединение (2G, Edge)
         newQuality = 'offline';
-        this.contentDebounce = 300;
-        this.cursorThrottle = 200;
+        this.contentDebounce = 250;
+        this.cursorThrottle = 150;
       }
       
       // Обновляем качество соединения в awareness если изменилось
@@ -413,7 +417,7 @@ export class DiffSyncManager {
         if (this.isActive) {
           this.onSyncStatus('connected');
         }
-      }, 100);
+      }, 30); // Быстрее возвращаемся в статус connected
     } finally {
       this.updateInProgress = false;
     }
