@@ -23,13 +23,23 @@ function getDatabaseUrl(): string {
 
 // Создаем экземпляр Prisma клиента с явной конфигурацией для serverless
 function createPrismaClient() {
+  // Отключаем DEBUG логи Prisma в production
+  if (process.env.NODE_ENV === 'production') {
+    process.env.DEBUG = '';
+  }
+
+  const databaseUrl = getDatabaseUrl();
+
   return new PrismaClient({
     datasources: {
       db: {
-        url: getDatabaseUrl(),
+        url: databaseUrl,
       },
     },
-    log: process.env.NODE_ENV === 'development' ? ['error', 'warn'] : ['error'],
+    // Минимальное логирование: только критические ошибки в production
+    log: process.env.NODE_ENV === 'production' 
+      ? [] // Полностью отключаем логи в production для максимальной производительности
+      : ['error', 'warn'], // В development оставляем только ошибки и предупреждения
   });
 }
 
@@ -60,4 +70,39 @@ export async function testPrismaConnection() {
     console.error('Prisma connection error:', error);
     return false;
   }
+}
+
+// Helper-функция для выполнения Prisma операций с автоматическим retry при P1017
+export async function withRetry<T>(
+  operation: () => Promise<T>,
+  maxRetries: number = 3
+): Promise<T> {
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      return await operation();
+    } catch (error: any) {
+      const isConnectionClosed = 
+        error?.code === 'P1017' || 
+        error?.message?.includes('Server has closed the connection') ||
+        error?.message?.includes('Connection terminated unexpectedly');
+
+      if (isConnectionClosed && attempt < maxRetries - 1) {
+        console.log(`[Prisma Retry] Connection closed, retrying (${attempt + 1}/${maxRetries})...`);
+        // Exponential backoff: 100ms, 200ms, 400ms
+        await new Promise(resolve => setTimeout(resolve, 100 * Math.pow(2, attempt)));
+        // Переподключаемся
+        try {
+          await prisma.$disconnect();
+          await prisma.$connect();
+        } catch (reconnectError) {
+          console.error('[Prisma Retry] Reconnection failed:', reconnectError);
+        }
+        continue;
+      }
+      
+      throw error;
+    }
+  }
+  
+  throw new Error('[Prisma Retry] All retry attempts failed');
 }

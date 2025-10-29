@@ -12,11 +12,21 @@
 
 	// Проверяем, авторизован ли пользователь
 	onMount(async () => {
-		// Если пользователь уже авторизован, перенаправляем на главную
-		if (userActions.getUser()) {
+		// Проверяем и пользователя в store, и наличие токена
+		// Это предотвращает редирект-луп после регистрации
+		const user = userActions.getUser();
+		const token = localStorage.getItem('session_token');
+		
+		if (user && token) {
 			console.log('[Login page] User already authenticated, redirecting to home');
 			goto('/');
 			return;
+		}
+		
+		// Если есть user в store но нет токена - очищаем store
+		if (user && !token) {
+			console.log('[Login page] User in store but no token, clearing store');
+			userActions.logout();
 		}
 		
 		// Обработка якорных ссылок

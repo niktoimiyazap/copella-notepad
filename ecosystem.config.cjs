@@ -16,7 +16,8 @@ module.exports = {
       max_memory_restart: '500M',
       env: {
         NODE_ENV: 'production',
-        YJS_WS_PORT: 1234
+        YJS_WS_PORT: 1234,
+        DEBUG: '' // Явно отключаем DEBUG логи для производительности
       },
       error_file: './logs/yjs-error.log',
       out_file: './logs/yjs-out.log',
@@ -34,7 +35,8 @@ module.exports = {
       max_memory_restart: '256M',
       env: {
         NODE_ENV: 'production',
-        NOTIFICATIONS_PORT: 3001
+        NOTIFICATIONS_PORT: 3001,
+        DEBUG: '' // Явно отключаем DEBUG логи для производительности
       },
       error_file: './logs/notifications-error.log',
       out_file: './logs/notifications-out.log',

@@ -1,6 +1,6 @@
 import { json } from '@sveltejs/kit';
 import { supabase } from '$lib/supabase-server';
-import { prisma } from '$lib/prisma';
+import { prisma, withRetry } from '$lib/prisma';
 import { createUserSession } from '$lib/session-new';
 import type { RequestHandler } from './$types';
 
@@ -23,16 +23,19 @@ export const POST: RequestHandler = async (event) => {
 			return json({ error: authError?.message || 'Invalid credentials' }, { status: 401 });
 		}
 
-		console.log('Supabase auth successful for:', email);
+	console.log('Supabase auth successful for:', email);
 
-		// 2. Проверяем/создаем пользователя в локальной БД
-		let dbUser = await prisma.user.findUnique({
+	// 2. Проверяем/создаем пользователя в локальной БД (с автоматическим retry)
+	let dbUser = await withRetry(() => 
+		prisma.user.findUnique({
 			where: { id: authData.user.id }
-		});
+		})
+	);
 
-		if (!dbUser) {
-			// Создаем пользователя если его нет
-			dbUser = await prisma.user.create({
+	if (!dbUser) {
+		// Создаем пользователя если его нет (с автоматическим retry)
+		dbUser = await withRetry(() =>
+			prisma.user.create({
 				data: {
 					id: authData.user.id,
 					email: authData.user.email || '',
@@ -40,8 +43,9 @@ export const POST: RequestHandler = async (event) => {
 					username: authData.user.user_metadata?.username || email.split('@')[0],
 					avatarUrl: authData.user.user_metadata?.avatar_url
 				}
-			});
-		}
+			})
+		);
+	}
 
 		// 3. Создаем сессию в cookie
 		console.log('[Login] Creating session for user:', dbUser.id);

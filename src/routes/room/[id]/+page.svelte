@@ -68,6 +68,18 @@
 		isMobile = isMobileDevice;
 	});
 
+	// Effect to update document title based on selected note
+	$effect(() => {
+		if (selectedNoteId) {
+			const selectedNote = roomData.notes.find(n => n.id === selectedNoteId);
+			if (selectedNote) {
+				document.title = `${selectedNote.title} - ${roomData.title}`;
+			}
+		} else {
+			document.title = roomData.title || 'Copella Notepad';
+		}
+	});
+
 	// Функция управления правым сайдбаром
 	function toggleRightSidebar() {
 		isRightSidebarOpen = !isRightSidebarOpen;
@@ -386,7 +398,44 @@
 
 	async function handleTitleChange(event: CustomEvent<{ newTitle: string }>) {
 		const { newTitle } = event.detail;
-		if (newTitle && newTitle !== roomData.title && roomId) {
+		
+		// Если открыта заметка - обновляем название заметки
+		if (selectedNoteId) {
+			const selectedNote = roomData.notes.find(n => n.id === selectedNoteId);
+			if (selectedNote && newTitle && newTitle !== selectedNote.title) {
+				const oldTitle = selectedNote.title;
+				try {
+					// Обновляем название в локальном состоянии
+					selectedNote.title = newTitle;
+					
+					// Сохраняем изменения на сервере
+					const { updateNote } = await import('$lib/notes');
+					const { note: updatedNote, error: updateError } = await updateNote(selectedNoteId, {
+						title: newTitle
+					});
+					
+					if (updateError) {
+						console.error('Error updating note title:', updateError);
+						// Возвращаем старое название в случае ошибки
+						selectedNote.title = oldTitle;
+						// TODO: Show error message to user
+					} else if (updatedNote) {
+						// Обновляем заметку в списке
+						const noteIndex = roomData.notes.findIndex(n => n.id === selectedNoteId);
+						if (noteIndex !== -1) {
+							roomData.notes[noteIndex] = updatedNote;
+						}
+					}
+				} catch (error) {
+					console.error('Unexpected error updating note title:', error);
+					// Возвращаем старое название в случае ошибки
+					selectedNote.title = oldTitle;
+					// TODO: Show error message to user
+				}
+			}
+		} 
+		// Если заметка не открыта - обновляем название комнаты
+		else if (newTitle && newTitle !== roomData.title && roomId) {
 			const oldTitle = roomData.title;
 			try {
 				// Обновляем название в локальном состоянии
@@ -497,8 +546,11 @@
 				onReload={() => window.location.reload()}
 			/>
 		{:else}
+		{@const selectedNote = selectedNoteId ? roomData.notes.find(n => n.id === selectedNoteId) : undefined}
+		{@const displayTitle = selectedNote ? selectedNote.title : roomData.title}
 		<RoomHeader 
-			title={roomData.title}
+			title={displayTitle}
+			roomTitle={roomData.title}
 			roomId={roomData.id}
 			onShare={handleShareRoom}
 			isOwner={$currentUser?.id === roomData.creator?.id}
@@ -507,6 +559,8 @@
 			onToggleRightSidebar={toggleRightSidebar}
 			showRightSidebarButton={isMobile && !isRightSidebarOpen}
 			isPublic={roomData.isPublic}
+			disabled={!canEdit}
+			isNoteTitle={!!selectedNote}
 			on:titleChange={handleTitleChange}
 		/>
 			

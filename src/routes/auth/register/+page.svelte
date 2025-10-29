@@ -128,6 +128,13 @@
 				return;
 			}
 
+			// Сохраняем токены сессии в localStorage
+			if (data.session) {
+				console.log('[Register] Saving session tokens after OTP verification');
+				localStorage.setItem('session_token', data.session.access_token);
+				localStorage.setItem('refresh_token', data.session.refresh_token);
+			}
+
 			// Переходим к следующему шагу
 			currentStep = 3;
 			step3Component?.setLoading(false);

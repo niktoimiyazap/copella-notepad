@@ -6,6 +6,7 @@
 
 	interface Props {
 		title: string;
+		roomTitle: string;
 		roomId?: string;
 		onShare?: () => void;
 		isOwner?: boolean;
@@ -14,9 +15,11 @@
 		onToggleRightSidebar?: () => void;
 		showRightSidebarButton?: boolean;
 		isPublic?: boolean;
+		disabled?: boolean;
+		isNoteTitle?: boolean;
 	}
 
-	let { title, roomId, onShare, isOwner = false, canInvite = false, canManageRoom = false, onToggleRightSidebar, showRightSidebarButton = false, isPublic = true }: Props = $props();
+	let { title, roomTitle, roomId, onShare, isOwner = false, canInvite = false, canManageRoom = false, onToggleRightSidebar, showRightSidebarButton = false, isPublic = true, disabled = false, isNoteTitle = false }: Props = $props();
 
 	// Получаем функции из context для управления левым сайдбаром
 	const toggleLeftSidebar = getContext<(() => void) | undefined>('toggleLeftSidebar');
@@ -41,6 +44,7 @@
 	});
 
 	function startEditing() {
+		if (disabled) return;
 		isEditing = true;
 		editTitle = title;
 		setTimeout(() => {
@@ -120,7 +124,8 @@
 					maxlength="50"
 					onkeydown={handleKeyDown}
 					onblur={saveTitle}
-					placeholder="Название комнаты"
+					placeholder={isNoteTitle ? "Название заметки" : "Название комнаты"}
+					disabled={disabled}
 				/>
 				<span class="char-counter" class:char-counter--warning={editTitle.length > 40}>
 					{editTitle.length}/50
@@ -129,11 +134,12 @@
 		{:else}
 			<div 
 				class="room-title" 
+				class:room-title--disabled={disabled}
 				onclick={startEditing} 
 				onkeydown={(e) => e.key === 'Enter' && startEditing()}
 				role="button"
-				tabindex="0"
-				title="Нажмите для редактирования"
+				tabindex={disabled ? -1 : 0}
+				title={disabled ? (isNoteTitle ? 'У вас нет прав на редактирование заметки' : 'У вас нет прав на редактирование названия комнаты') : 'Нажмите для редактирования'}
 			>
 				{title}
 			</div>
@@ -179,7 +185,7 @@
 <ShareRoomModal
 	isOpen={isShareModalOpen}
 	onClose={closeShareModal}
-	roomTitle={title}
+	roomTitle={roomTitle}
 	roomId={roomId}
 	isOwner={isOwner}
 	canInvite={canInvite}
@@ -237,6 +243,17 @@
 		border-color: rgba(254, 177, 255, 0.2);
 	}
 
+	.room-title--disabled {
+		cursor: default;
+		opacity: 0.6;
+	}
+
+	.room-title--disabled:hover {
+		color: #FFFFFF;
+		background: transparent;
+		border-color: transparent;
+	}
+
 	.title-input-wrapper {
 		position: relative;
 		min-width: 0;
@@ -267,6 +284,11 @@
 	.title-input:focus {
 		border-color: #FEB1FF;
 		background: rgba(255, 255, 255, 0.03);
+	}
+
+	.title-input:disabled {
+		opacity: 0.6;
+		cursor: not-allowed;
 	}
 
 	.char-counter {
