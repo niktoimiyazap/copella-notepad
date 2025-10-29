@@ -474,70 +474,71 @@
 		showLoading = true;
 		
 		try {
-			// Проверяем наличие roomId
 			if (!roomId) {
 				error = 'ID комнаты не найден';
 				isLoading = false;
 				return;
 			}
 			
-			// Получаем текущего пользователя из централизованного store
 			if (!$currentUser) {
 				const { user, error: userError } = await fetchCurrentUser();
 				if (userError || !user) {
-					console.warn('User authentication error on retry (continuing anyway):', userError);
-					// НЕ останавливаем - продолжаем работу
+					console.warn('User authentication error on retry:', userError);
 				}
 			}
 
-			// Загружаем данные комнаты
-			const { room, error: roomError } = await getRoom(roomId);
-			if (roomError || !room) {
-				error = roomError || 'Комната не найдена';
+			// Параллельная загрузка (копия логики из onMount)
+			const [roomResult, notesResult, participantsResult] = await Promise.all([
+				getRoom(roomId),
+				getRoomNotes(roomId),
+				getRoomParticipants(roomId)
+			]);
+
+			if (roomResult.error || !roomResult.room) {
+				error = roomResult.error || 'Комната не найдена';
 				isLoading = false;
 				return;
 			}
-			
-		roomData.id = room.id;
-		roomData.title = room.title;
-		roomData.participants = room.participants;
-		roomData.creator = room.creator;
-		roomData.isPublic = room.isPublic;
 
-			// Проверяем права доступа пользователя в комнате
+			const room = roomResult.room;
+			roomData.id = room.id;
+			roomData.title = room.title;
+			roomData.creator = room.creator;
+			roomData.isPublic = room.isPublic;
+
+			if (notesResult.error) {
+				error = notesResult.error;
+			} else {
+				roomData.notes = notesResult.notes;
+			}
+
+			if (participantsResult.error) {
+				console.error('Participants fetch error:', participantsResult.error);
+			} else {
+				roomData.participants = participantsResult.participants as Participant[];
+			}
+
 			if ($currentUser?.id) {
-				const { permissions, error: permError } = await getUserRoomPermissions($currentUser.id, roomId);
-				if (!permError) {
-					canEdit = permissions.canEdit;
-					canDelete = permissions.canDelete;
+				const [permissionsResult] = await Promise.all([
+					getUserRoomPermissions($currentUser.id, roomId),
+					updateOnlineStatus(true)
+				]);
+
+				if (!permissionsResult.error) {
+					canEdit = permissionsResult.permissions.canEdit;
+					canDelete = permissionsResult.permissions.canDelete;
+					canInvite = permissionsResult.permissions.canInvite;
+					canManageRoom = permissionsResult.permissions.canManageRoom;
 				}
 			}
 
-			// Загружаем заметки комнаты
-			const { notes, error: notesError } = await getRoomNotes(roomId);
-			if (notesError) {
-				error = notesError;
-			} else {
-				roomData.notes = notes;
-			}
-
-		// Инициализируем отслеживание онлайн статуса участников
-		// И ждем подключения к WebSocket ПЕРЕД показом интерфейса
-		// ТОЛЬКО если пользователь является участником комнаты
-		if ($currentUser?.id) {
-	// Yjs автоматически обрабатывает онлайн статусы участников
-	}
-
-			// Скрываем загрузку после подключения к WebSocket
 			showLoading = false;
-			setTimeout(() => {
-				isLoading = false;
-			}, 450);
-	} catch (err) {
-		error = 'Ошибка загрузки данных комнаты';
-		isLoading = false;
+			isLoading = false;
+		} catch (err) {
+			error = 'Ошибка загрузки данных комнаты';
+			isLoading = false;
+		}
 	}
-}
 </script>
 
 <div class="room-page">
