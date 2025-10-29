@@ -55,6 +55,11 @@ model Room {
   participants RoomParticipant[]
   notes        Note[]
   invites      RoomInvite[]
+
+  // Индексы для оптимизации запросов
+  @@index([createdBy])
+  @@index([createdAt])
+  @@index([isPublic])
 }
 
 // Enum для ролей участников комнаты
@@ -87,6 +92,8 @@ model RoomParticipant {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([roomId, userId])
+  @@index([userId])
+  @@index([roomId])
 }
 
 // Модель заметки
@@ -103,6 +110,12 @@ model Note {
   room     Room     @relation(fields: [roomId], references: [id], onDelete: Cascade)
   creator  User?    @relation("NoteCreator", fields: [createdBy], references: [id], onDelete: SetNull)
   noteTags NoteTag[]
+  yjsUpdates YjsUpdate[]
+
+  // Индексы для оптимизации запросов
+  @@index([roomId])
+  @@index([updatedAt])
+  @@index([createdBy])
 }
 
 // Модель тега
@@ -204,4 +217,21 @@ model UserSettings {
 
   // Связи
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// Модель для хранения YJS updates (персистентность collaborative editing)
+model YjsUpdate {
+  id        String   @id @default(cuid())
+  noteId    String
+  clock     Int      // Yjs clock для векторных часов
+  data      Bytes    // Бинарные данные Yjs update (сжатые)
+  createdAt DateTime @default(now())
+
+  // Связи
+  note Note @relation(fields: [noteId], references: [id], onDelete: Cascade)
+
+  // Индексы для быстрого поиска
+  @@index([noteId, clock])
+  @@index([noteId])
+  @@unique([noteId, clock])
 }

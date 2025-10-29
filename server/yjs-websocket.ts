@@ -1,51 +1,107 @@
 /**
- * Простой y-websocket сервер для синхронизации Yjs
+ * YJS WebSocket сервер с персистентностью в PostgreSQL
  * Работает на порту 1234
  */
 
 import { WebSocketServer } from 'ws';
-// Импортируем setupWSConnection из @y/websocket-server (новый пакет)
-import { setupWSConnection } from '@y/websocket-server/utils';
+import * as Y from 'yjs';
+import { loadYjsDocument, saveYjsUpdate } from './yjs-persistence';
 
 const PORT = process.env.YJS_WS_PORT || 1234;
+
+// Кеш активных документов в памяти (для производительности)
+const docs = new Map<string, Y.Doc>();
 
 // Создаем WebSocket сервер с адаптивным сжатием
 const wss = new WebSocketServer({ 
   port: Number(PORT),
-  // Включаем агрессивное сжатие для текстовых данных (Yjs отлично сжимается)
   perMessageDeflate: {
     zlibDeflateOptions: {
       chunkSize: 1024,
       memLevel: 8,
-      level: 6 // Более сильное сжатие (текст сжимается отлично)
+      level: 6
     },
     zlibInflateOptions: {
       chunkSize: 10 * 1024
     },
     clientNoContextTakeover: true,
     serverNoContextTakeover: true,
-    serverMaxWindowBits: 15, // Максимальный размер окна для лучшего сжатия
+    serverMaxWindowBits: 15,
     concurrencyLimit: 10,
-    threshold: 256 // Сжимаем даже небольшие сообщения (256 байт)
+    threshold: 256
   }
 });
 
-console.log(`[Yjs WebSocket] 🚀 Server started on port ${PORT}`);
+console.log(`[Yjs WebSocket] 🚀 Server started on port ${PORT} with PostgreSQL persistence`);
 
-// Обработка подключений
-wss.on('connection', (ws, req) => {
-  const docName = req.url?.slice(1) || 'default';
-  console.log(`[Yjs] Client connected to doc: ${docName}`);
+/**
+ * Получает или создает YJS документ для заметки
+ */
+async function getOrCreateDoc(noteId: string): Promise<Y.Doc> {
+  let ydoc = docs.get(noteId);
   
-  // setupWSConnection автоматически:
-  // - Создает/получает Y.Doc
-  // - Настраивает синхронизацию
-  // - Обрабатывает awareness
-  // - Управляет подключениями
-  setupWSConnection(ws, req, {
-    docName: docName,
-    gc: true // Включаем garbage collection для Yjs
-  });
+  if (!ydoc) {
+    console.log(`[Yjs] Loading document from DB: ${noteId}`);
+    ydoc = await loadYjsDocument(noteId);
+    docs.set(noteId, ydoc);
+    
+    // Подписываемся на обновления для сохранения в БД
+    ydoc.on('update', (update: Uint8Array) => {
+      // Сохраняем асинхронно, не блокируя синхронизацию
+      saveYjsUpdate(noteId, update).catch(err => 
+        console.error(`[Yjs] Error saving update for ${noteId}:`, err)
+      );
+    });
+    
+    // Очищаем документ из памяти после 10 минут неактивности
+    setTimeout(() => {
+      if (ydoc && ydoc.conns?.size === 0) {
+        docs.delete(noteId);
+        console.log(`[Yjs] Removed inactive document from memory: ${noteId}`);
+      }
+    }, 10 * 60 * 1000);
+  }
+  
+  return ydoc;
+}
+
+// Обработка подключений (упрощенная версия без @y/websocket-server)
+wss.on('connection', async (ws, req) => {
+  const noteId = req.url?.slice(1) || 'default';
+  console.log(`[Yjs] Client connected to note: ${noteId}`);
+  
+  try {
+    const ydoc = await getOrCreateDoc(noteId);
+    
+    // Отправляем полное состояние документа клиенту
+    const syncMessage = Y.encodeStateAsUpdate(ydoc);
+    ws.send(syncMessage);
+    
+    // Обрабатываем входящие обновления от клиента
+    ws.on('message', (data: Buffer) => {
+      try {
+        // Применяем обновление к документу (автоматически вызовет событие 'update')
+        Y.applyUpdate(ydoc, new Uint8Array(data));
+        
+        // Рассылаем обновление всем подключенным клиентам
+        wss.clients.forEach(client => {
+          if (client !== ws && client.readyState === 1) {
+            client.send(data);
+          }
+        });
+      } catch (error) {
+        console.error('[Yjs] Error processing update:', error);
+      }
+    });
+    
+    ws.on('close', () => {
+      console.log(`[Yjs] Client disconnected from note: ${noteId}`);
+    });
+    
+  } catch (error) {
+    console.error(`[Yjs] Error setting up connection for ${noteId}:`, error);
+    ws.close();
+  }
 });
 
 wss.on('error', (error) => {
