@@ -118,34 +118,41 @@
 			}
 		}
 
-		// ОПТИМИЗАЦИЯ: Параллельная загрузка данных комнаты и заметок
-		const [roomResult, notesResult] = await Promise.all([
-			getRoom(roomId),
-			getRoomNotes(roomId)
-		]);
+	// ОПТИМИЗАЦИЯ: Параллельная загрузка всех данных комнаты
+	const [roomResult, notesResult, participantsResult] = await Promise.all([
+		getRoom(roomId),
+		getRoomNotes(roomId),
+		getRoomParticipants(roomId)
+	]);
 
-		// Обработка результата загрузки комнаты
-		if (roomResult.error || !roomResult.room) {
-			console.error('Room fetch error:', roomResult.error);
-			error = roomResult.error || 'Комната не найдена';
-			isLoading = false;
-			return;
-		}
+	// Обработка результата загрузки комнаты
+	if (roomResult.error || !roomResult.room) {
+		console.error('Room fetch error:', roomResult.error);
+		error = roomResult.error || 'Комната не найдена';
+		isLoading = false;
+		return;
+	}
 
-		const room = roomResult.room;
-		roomData.id = room.id;
-		roomData.title = room.title;
-		roomData.participants = room.participants;
-		roomData.creator = room.creator;
-		roomData.isPublic = room.isPublic;
+	const room = roomResult.room;
+	roomData.id = room.id;
+	roomData.title = room.title;
+	roomData.creator = room.creator;
+	roomData.isPublic = room.isPublic;
 
-		// Обработка результата загрузки заметок
-		if (notesResult.error) {
-			console.error('Notes fetch error:', notesResult.error);
-			error = notesResult.error;
-		} else {
-			roomData.notes = notesResult.notes;
-		}
+	// Обработка результата загрузки заметок
+	if (notesResult.error) {
+		console.error('Notes fetch error:', notesResult.error);
+		error = notesResult.error;
+	} else {
+		roomData.notes = notesResult.notes;
+	}
+
+	// Обработка результата загрузки участников
+	if (participantsResult.error) {
+		console.error('Participants fetch error:', participantsResult.error);
+	} else {
+		roomData.participants = participantsResult.participants as Participant[];
+	}
 
 		// Загружаем права доступа параллельно с обновлением онлайн статуса
 		if ($currentUser?.id) {
