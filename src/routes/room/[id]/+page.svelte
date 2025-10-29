@@ -109,79 +109,79 @@
 				return;
 			}
 			
-			// Получаем текущего пользователя из централизованного store
-			// Если пользователь еще не загружен, загружаем его
-			if (!$currentUser) {
-				const { user, error: userError } = await fetchCurrentUser();
-				if (userError || !user) {
-					console.warn('User authentication error (continuing anyway):', userError);
-					// НЕ останавливаем загрузку - просто работаем без пользователя
-				}
+		// Получаем текущего пользователя из централизованного store
+		// Если пользователь еще не загружен, загружаем его
+		if (!$currentUser) {
+			const { user, error: userError } = await fetchCurrentUser();
+			if (userError || !user) {
+				console.warn('User authentication error (continuing anyway):', userError);
 			}
+		}
 
-			// Загружаем данные комнаты
-			const { room, error: roomError } = await getRoom(roomId);
-			if (roomError || !room) {
-				console.error('Room fetch error:', roomError);
-				error = roomError || 'Комната не найдена';
-				isLoading = false;
-				return;
-			}
-			
+		// ОПТИМИЗАЦИЯ: Параллельная загрузка данных комнаты и заметок
+		const [roomResult, notesResult] = await Promise.all([
+			getRoom(roomId),
+			getRoomNotes(roomId)
+		]);
+
+		// Обработка результата загрузки комнаты
+		if (roomResult.error || !roomResult.room) {
+			console.error('Room fetch error:', roomResult.error);
+			error = roomResult.error || 'Комната не найдена';
+			isLoading = false;
+			return;
+		}
+
+		const room = roomResult.room;
 		roomData.id = room.id;
 		roomData.title = room.title;
 		roomData.participants = room.participants;
 		roomData.creator = room.creator;
 		roomData.isPublic = room.isPublic;
 
-			// Проверяем права доступа пользователя в комнате
-			if ($currentUser?.id) {
-				const { permissions, error: permError } = await getUserRoomPermissions($currentUser.id, roomId);
-				if (!permError) {
-					canEdit = permissions.canEdit;
-					canDelete = permissions.canDelete;
-					canInvite = permissions.canInvite;
-					canManageRoom = permissions.canManageRoom;
-				}
+		// Обработка результата загрузки заметок
+		if (notesResult.error) {
+			console.error('Notes fetch error:', notesResult.error);
+			error = notesResult.error;
+		} else {
+			roomData.notes = notesResult.notes;
 		}
 
-			// Загружаем заметки комнаты
-			const { notes, error: notesError } = await getRoomNotes(roomId);
-			if (notesError) {
-				console.error('Notes fetch error:', notesError);
-				error = notesError;
-			} else {
-				roomData.notes = notes;
-			}
-
-		// Обновляем онлайн статус при входе в комнату
+		// Загружаем права доступа параллельно с обновлением онлайн статуса
 		if ($currentUser?.id) {
-			await updateOnlineStatus(true);
-			
-			// Подписываемся на WebSocket уведомления для обновления онлайн статуса
+			const [permissionsResult] = await Promise.all([
+				getUserRoomPermissions($currentUser.id, roomId),
+				updateOnlineStatus(true)
+			]);
+
+			if (!permissionsResult.error) {
+				canEdit = permissionsResult.permissions.canEdit;
+				canDelete = permissionsResult.permissions.canDelete;
+				canInvite = permissionsResult.permissions.canInvite;
+				canManageRoom = permissionsResult.permissions.canManageRoom;
+			}
+		}
+
+		// Подписываемся на WebSocket уведомления (не блокируем UI)
+		if ($currentUser?.id) {
 			const notificationsClient = getNotificationsClient();
 			notificationsClient.subscribeToRoom(roomId);
 			
-			// Слушаем обновления участников
 			const handleParticipantUpdate = (data: any) => {
-				// Перезагружаем список участников
 				reloadParticipants();
 			};
 			
 			notificationsClient.on('participant:update', handleParticipantUpdate);
 			
-			// Сохраняем функцию отключения
 			disconnectOnlineTracking = () => {
 				notificationsClient.off('participant:update', handleParticipantUpdate);
 				notificationsClient.unsubscribeFromRoom(roomId);
 			};
 		}
 
-			// Скрываем загрузку после подключения к WebSocket
-			showLoading = false;
-			setTimeout(() => {
-				isLoading = false;
-			}, 450);
+		// Убираем искусственную задержку - показываем UI сразу
+		showLoading = false;
+		isLoading = false;
 		} catch (err) {
 			console.error('Unexpected error loading room data:', err);
 			error = 'Ошибка загрузки данных комнаты';
