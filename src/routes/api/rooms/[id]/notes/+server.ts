@@ -6,21 +6,12 @@ import { getCurrentUserFromToken } from '$lib/utils/userManagement';
 // GET /api/rooms/[id]/notes - получить заметки комнаты
 export const GET: RequestHandler = async ({ params, request, cookies }) => {
 	try {
-		const roomId = params.id;
-		
-		// Валидация ID комнаты
-		if (!roomId || typeof roomId !== 'string') {
-			console.error('Invalid room ID:', roomId);
-			return json({ error: 'Invalid room ID' }, { status: 400 });
-		}
-		
-		// Проверяем формат CUID (должен быть 25 символов)
-		if (roomId.length !== 25) {
-			console.error('Invalid room ID format:', roomId, 'length:', roomId.length);
-			return json({ error: 'Invalid room ID format' }, { status: 400 });
-		}
-		
-		console.log('Fetching notes for room:', roomId);
+	const roomId = params.id;
+	
+	// Валидация ID комнаты
+	if (!roomId || typeof roomId !== 'string' || roomId.length !== 25) {
+		return json({ error: 'Invalid room ID' }, { status: 400 });
+	}
 
 		// Получаем текущего пользователя
 		const { user, error: authError } = await getCurrentUserFromToken(request, cookies);
@@ -29,9 +20,7 @@ export const GET: RequestHandler = async ({ params, request, cookies }) => {
 		}
 
 	// Проверяем доступ к комнате - только для создателя и участников
-	console.log('Checking access to room:', roomId, 'for user:', user.id);
-	
-	const room = await prisma.room.findFirst({
+	const hasAccess = await prisma.room.findFirst({
 		where: {
 			id: roomId,
 			OR: [
@@ -44,39 +33,42 @@ export const GET: RequestHandler = async ({ params, request, cookies }) => {
 					}
 				}
 			]
+		},
+		select: { id: true } // Минимальный запрос для проверки доступа
+	});
+
+	if (!hasAccess) {
+		return json({ error: 'Room not found or access denied' }, { status: 404 });
+	}
+
+	// Получаем заметки (оптимизировано с индексом по roomId)
+	const notesData = await prisma.note.findMany({
+		where: {
+			roomId: roomId
+		},
+		select: {
+			id: true,
+			title: true,
+			content: true,
+			createdBy: true,
+			createdAt: true,
+			updatedAt: true,
+			// Минимальные данные создателя
+			creator: {
+				select: {
+					id: true,
+					username: true,
+					fullName: true,
+					avatarUrl: true
+				}
+			}
+		},
+		orderBy: {
+			updatedAt: 'desc'
 		}
 	});
 
-		if (!room) {
-			console.error('Room not found or access denied for user:', user.id, 'room:', roomId);
-			return json({ error: 'Room not found or access denied' }, { status: 404 });
-		}
-		
-		console.log('Room found:', room.title, 'isPublic:', room.isPublic);
-
-		// Получаем заметки из локальной базы данных (Prisma)
-		const notesData = await prisma.note.findMany({
-			where: {
-				roomId: roomId
-			},
-			orderBy: {
-				updatedAt: 'desc'
-			},
-			include: {
-				creator: {
-					select: {
-						id: true,
-						username: true,
-						fullName: true,
-						avatarUrl: true
-					}
-				}
-			}
-		});
-
-		console.log('Notes fetched from local database:', notesData.length);
-
-		return json({ notes: notesData || [] });
+	return json({ notes: notesData || [] });
 	} catch (error) {
 		console.error('Error fetching room notes:', error);
 		return json({ error: 'Internal server error' }, { status: 500 });
@@ -148,7 +140,6 @@ export const POST: RequestHandler = async ({ params, request, cookies }) => {
 			}
 		});
 
-		console.log('Note created successfully:', note.id);
 		return json({ note }, { status: 201 });
 	} catch (error) {
 		console.error('Error creating note:', error);

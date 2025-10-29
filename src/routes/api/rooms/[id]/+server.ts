@@ -15,6 +15,8 @@ export const GET: RequestHandler = async ({ params, request, cookies }) => {
 		}
 
 	// Получаем комнату - доступ только для создателя и участников
+	// ОПТИМИЗАЦИЯ: Убрали загрузку notes и participants для ускорения
+	// Они загружаются отдельными запросами через /api/rooms/[id]/notes и /api/rooms/[id]/participants
 	const room = await prisma.room.findFirst({
 		where: {
 			id: roomId,
@@ -29,64 +31,53 @@ export const GET: RequestHandler = async ({ params, request, cookies }) => {
 				}
 			]
 		},
-			include: {
-				creator: {
-					select: {
-						id: true,
-						username: true,
-						fullName: true,
-						avatarUrl: true
-					}
-				},
-				participants: {
-					include: {
-						user: {
-							select: {
-								id: true,
-								username: true,
-								fullName: true,
-								avatarUrl: true
-							}
-						}
-					}
-				},
-				notes: {
-					orderBy: {
-						updatedAt: 'desc'
-					},
-					include: {
-						creator: {
-							select: {
-								id: true,
-								username: true,
-								fullName: true,
-								avatarUrl: true
-							}
-						}
-					}
-				},
-				_count: {
-					select: {
-						participants: true,
-						notes: true
-					}
+		select: {
+			id: true,
+			title: true,
+			description: true,
+			isPublic: true,
+			coverImageUrl: true,
+			participantLimit: true,
+			createdBy: true,
+			createdAt: true,
+			updatedAt: true,
+			allowEdit: true,
+			allowInvite: true,
+			allowDelete: true,
+			requireApproval: true,
+			timeRestricted: true,
+			accessUntil: true,
+			// Только создатель и счетчики
+			creator: {
+				select: {
+					id: true,
+					username: true,
+					fullName: true,
+					avatarUrl: true
+				}
+			},
+			_count: {
+				select: {
+					participants: true,
+					notes: true
 				}
 			}
-		});
-
-		if (!room) {
-			return json({ error: 'Room not found' }, { status: 404 });
 		}
+	});
 
-		// Sort participants by role (creator first, then admin, then participant) and then by joinedAt
-		const roleOrder = { creator: 0, admin: 1, participant: 2 };
-		room.participants.sort((a, b) => {
-			const roleDiff = roleOrder[a.role as keyof typeof roleOrder] - roleOrder[b.role as keyof typeof roleOrder];
-			if (roleDiff !== 0) return roleDiff;
-			return new Date(a.joinedAt).getTime() - new Date(b.joinedAt).getTime();
-		});
+	if (!room) {
+		return json({ error: 'Room not found' }, { status: 404 });
+	}
 
-		return json({ room });
+	// Добавляем пустые массивы для обратной совместимости с фронтендом
+	// Фронтенд загружает participants и notes отдельными запросами
+	const roomWithArrays = {
+		...room,
+		participants: [],
+		notes: []
+	};
+
+	return json({ room: roomWithArrays });
 	} catch (error) {
 		console.error('Error fetching room:', error);
 		return json({ error: 'Internal server error' }, { status: 500 });
