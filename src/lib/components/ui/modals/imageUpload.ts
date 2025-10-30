@@ -40,6 +40,8 @@ export interface ImageUploadActions {
 	clearImageState: () => void;
 }
 
+import { compressImage, IMAGE_PRESETS } from '$lib/utils/imageOptimization';
+
 export function createImageUploadActions(
 	state: ImageUploadState,
 	updateState: (updates: Partial<ImageUploadState>) => void,
@@ -78,9 +80,17 @@ export function createImageUploadActions(
 					throw new Error('Необходима авторизация');
 				}
 
-				// Загружаем файл в Supabase Storage
+				// Сжимаем изображение перед загрузкой
+				const compressedBlob = await compressImage(
+					file,
+					IMAGE_PRESETS.roomCover.maxWidth,
+					IMAGE_PRESETS.roomCover.maxHeight,
+					IMAGE_PRESETS.roomCover.quality
+				);
+
+				// Загружаем сжатый файл в Supabase Storage
 				const formData = new FormData();
-				formData.append('file', file);
+				formData.append('file', compressedBlob, 'cover.jpg');
 				
 				const response = await fetch('/api/upload/room-cover', {
 					method: 'POST',

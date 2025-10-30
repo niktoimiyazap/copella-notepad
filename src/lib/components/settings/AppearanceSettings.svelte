@@ -32,7 +32,11 @@
 	
 	async function loadAppearanceSettings() {
 		try {
-			const response = await fetch('/api/settings/appearance');
+			const token = localStorage.getItem('session_token');
+			const response = await fetch('/api/settings/appearance', {
+				headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+				credentials: 'include'
+			});
 			if (response.ok) {
 				const data = await response.json();
 				theme = data.theme ?? 'dark';
@@ -51,9 +55,14 @@
 		message = null;
 		
 		try {
+			const token = localStorage.getItem('session_token');
 			const response = await fetch('/api/settings/appearance', {
 				method: 'PATCH',
-				headers: { 'Content-Type': 'application/json' },
+				headers: { 
+					'Content-Type': 'application/json',
+					...(token ? { 'Authorization': `Bearer ${token}` } : {})
+				},
+				credentials: 'include',
 				body: JSON.stringify({
 					theme,
 					accentColor,

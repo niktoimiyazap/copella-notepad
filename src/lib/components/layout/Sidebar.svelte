@@ -21,7 +21,6 @@
 	
 	let sidebarElement: HTMLElement;
 	let backdropElement: HTMLElement;
-	let hoverTimeout: ReturnType<typeof setTimeout>;
 	let isMobile = $state(false);
 	let windowWidth = $state(0);
 	let isCreateRoomModalOpen = $state(false);
@@ -32,14 +31,12 @@
 	// Effect to update isMobile when windowWidth changes
 	$effect(() => {
 		isMobile = isMobileDevice;
-		// Убираем автоматическое раскрытие сайдбара при определении мобильного устройства
 	});
 	
 	onMount(() => {
 		// Initial check
 		windowWidth = window.innerWidth;
 		isMobile = windowWidth <= 768;
-		// Убираем автоматическое раскрытие сайдбара при инициализации
 		
 		const handleResize = () => {
 			windowWidth = window.innerWidth;
@@ -52,27 +49,16 @@
 		};
 	});
 	
-	// Desktop hover handlers
-	function handleMouseEnter() {
-		if (!isMobile) {
-			clearTimeout(hoverTimeout);
-			hoverTimeout = setTimeout(() => {
-				isMini = false;
-			}, 150); // 150ms delay
-		}
-	}
-	
-	function handleMouseLeave() {
-		if (!isMobile) {
-			clearTimeout(hoverTimeout);
-			isMini = true;
-		}
-	}
-	
-	// Mobile handlers
-	function toggleSidebar() {
-		if (isMobile && onToggle) {
-			onToggle();
+	// Toggle sidebar function
+	function toggleCollapse() {
+		if (isMobile) {
+			// На мобильных управляем открытием/закрытием через callback
+			if (onToggle) {
+				onToggle();
+			}
+		} else {
+			// На десктопе управляем сворачиванием
+			isMini = !isMini;
 		}
 	}
 	
@@ -180,9 +166,15 @@
 	class:sidebar--mobile-open={isMobile && isOpen}
 	class:sidebar--mobile={isMobile}
 	bind:this={sidebarElement}
-	onmouseenter={handleMouseEnter}
-	onmouseleave={handleMouseLeave}
 >
+	{#if !isMobile}
+		<button class="toggle-btn" onclick={toggleCollapse} title={isMini ? 'Развернуть' : 'Свернуть'}>
+			<svg class="chevron-icon" class:rotated={!isMini} viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+				<path d="M9 18l6-6-6-6"/>
+			</svg>
+		</button>
+	{/if}
+	
 	<div class="sidebar-header">
 		<img 
 			src={(isMobile && isOpen) || (!isMobile && !isMini) ? "/logo/cnotepad-full.png" : "/logo/cnotepad.png"} 
@@ -251,6 +243,11 @@
 			<img src="/icons/log-out.svg" alt="Logout" class="nav-icon" />
 			<span>Выйти</span>
 		</button>
+		
+		<div class="company-info">
+			<span class="company-name">© {new Date().getFullYear()} Copella</span>
+			<span class="app-version">v0.2 beta</span>
+		</div>
 	</div>
 </aside>
 

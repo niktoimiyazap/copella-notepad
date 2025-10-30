@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { getOptimizedAvatar } from '$lib/utils/imageOptimization';
+	
 	interface Props {
 		username?: string;
 		avatarUrl?: string;
@@ -10,17 +12,39 @@
 	// Получаем первую букву username
 	const firstLetter = $derived(username.charAt(0).toUpperCase() || '?');
 	
-	// Размеры для разных вариантов
-	const sizeClasses = {
-		small: 'avatar--small',
-		medium: 'avatar--medium', 
-		large: 'avatar--large'
-	};
+	// Оптимизированный URL аватара
+	const optimizedAvatarUrl = $derived(getOptimizedAvatar(avatarUrl, size));
+	
+	// Состояние загрузки
+	let imageLoaded = $state(false);
+	let imageError = $state(false);
+	
+	function handleImageLoad() {
+		imageLoaded = true;
+	}
+	
+	function handleImageError() {
+		imageError = true;
+	}
 </script>
 
 <div class="user-avatar" class:avatar--small={size === 'small'} class:avatar--medium={size === 'medium'} class:avatar--large={size === 'large'}>
-	{#if avatarUrl}
-		<img src={avatarUrl} alt="User Avatar" class="avatar-image" />
+	{#if optimizedAvatarUrl && !imageError}
+		<img 
+			src={optimizedAvatarUrl} 
+			alt="User Avatar" 
+			class="avatar-image"
+			class:avatar-image--loaded={imageLoaded}
+			loading="lazy"
+			decoding="async"
+			onload={handleImageLoad}
+			onerror={handleImageError}
+		/>
+		{#if !imageLoaded}
+			<div class="avatar-letter avatar-placeholder">
+				{firstLetter}
+			</div>
+		{/if}
 	{:else}
 		<div class="avatar-letter">
 			{firstLetter}
@@ -61,6 +85,19 @@
 		height: 100%;
 		object-fit: cover;
 		border-radius: 50%;
+		position: absolute;
+		top: 0;
+		left: 0;
+		opacity: 0;
+		transition: opacity 0.3s ease-in-out;
+	}
+	
+	.avatar-image--loaded {
+		opacity: 1;
+	}
+	
+	.avatar-placeholder {
+		opacity: 0.5;
 	}
 
 	.avatar-letter {

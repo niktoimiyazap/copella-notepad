@@ -5,10 +5,13 @@
 .sidebar {
 	position: relative;
 	height: 100vh;
+	/* Используем динамическую высоту для мобильных устройств */
+	max-height: 100dvh;
+	max-height: var(--app-height, 100vh);
 	background-color: #1A1A1A;
 	display: flex;
 	flex-direction: column;
-	overflow: hidden;
+	overflow: visible;
 	border-right: 1px solid #2A2A2A;
 	z-index: 100;
 	animation: fadeIn 0.3s ease-in-out;
@@ -52,6 +55,11 @@
 	z-index: 1000;
 	transform: translateX(-100%);
 	width: 280px;
+	/* Используем реальную высоту экрана для мобильных */
+	height: 100dvh;
+	height: var(--app-height, 100vh);
+	max-height: 100dvh;
+	max-height: var(--app-height, 100vh);
 }
 
 .sidebar--mobile-open {
@@ -64,12 +72,16 @@
 	border-bottom: 1px solid #2A2A2A;
 	display: flex;
 	align-items: center;
-	justify-content: center;
+	justify-content: flex-start;
+	gap: 12px;
 	flex-shrink: 0; /* Предотвращаем сжатие header */
+	position: relative;
+	overflow: visible;
 }
 
-.sidebar--expanded .sidebar-header {
-	justify-content: flex-start;
+.sidebar--mini .sidebar-header {
+	padding: 16px 12px;
+	justify-content: center;
 }
 
 .sidebar-logo {
@@ -99,6 +111,56 @@
 	height: 40px;
 }
 
+/* Toggle button */
+.toggle-btn {
+	width: 24px;
+	height: 48px;
+	background: #1A1A1A;
+	border: 1px solid #2A2A2A;
+	border-left: none;
+	border-radius: 0 8px 8px 0;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	cursor: pointer;
+	transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+	position: absolute;
+	top: 20px;
+	right: -24px;
+	flex-shrink: 0;
+	padding: 0;
+	z-index: 10;
+}
+
+.toggle-btn:hover {
+	background: #242424;
+	border-color: #3A3A3A;
+	transform: translateX(2px);
+}
+
+.toggle-btn:active {
+	transform: translateX(0);
+}
+
+.chevron-icon {
+	width: 14px;
+	height: 14px;
+	color: #7e7e7e;
+	transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+	filter: brightness(0) invert(1);
+	opacity: 0.6;
+}
+
+.toggle-btn:hover .chevron-icon {
+	opacity: 1;
+	color: #FEB1FF;
+	filter: brightness(0) invert(1);
+}
+
+.chevron-icon.rotated {
+	transform: rotate(180deg);
+}
+
 /* Sidebar navigation */
 .sidebar-nav {
 	flex: 1;
@@ -108,6 +170,7 @@
 	gap: 8px;
 	overflow-y: auto; /* Навигация может прокручиваться если много комнат */
 	overflow-x: hidden;
+	min-height: 0; /* Важно для правильной работы flex и overflow */
 }
 
 .sidebar--expanded .sidebar-nav {
@@ -145,22 +208,10 @@
 .nav-button:hover {
 	background-color: #2A2A2A;
 	color: #ffffff;
-	transform: translateY(-1px);
-}
-
-/* Исправление для мини-сайдбара - убираем transform для кнопок с абсолютно позиционированными иконками */
-.sidebar--mini .nav-button:hover {
-	transform: none;
 }
 
 .nav-button:hover .nav-icon {
 	opacity: 1;
-	transform: scale(1.1);
-}
-
-/* Исправление для мини-сайдбара - убираем scale для абсолютно позиционированных иконок */
-.sidebar--mini .nav-button:hover .nav-icon {
-	transform: translate(-50%, -50%);
 }
 
 .nav-button--primary {
@@ -185,8 +236,18 @@
 .sidebar--mini .nav-button span {
 	opacity: 0;
 	width: 0;
-	overflow: hidden;
-	transition: opacity 0.2s ease 0.1s, width 0.2s ease 0.1s;
+	pointer-events: none;
+	position: absolute;
+}
+
+/* Navigation icons base */
+.nav-icon {
+	width: 20px;
+	height: 20px;
+	filter: brightness(0) invert(1);
+	flex-shrink: 0;
+	opacity: 0.5;
+	transition: none;
 }
 
 /* Center icons in mini sidebar */
@@ -198,18 +259,24 @@
 	transform: translate(-50%, -50%);
 }
 
+.sidebar--expanded .nav-button {
+	position: static;
+}
+
 .sidebar--expanded .nav-button span {
 	opacity: 1;
 	width: auto;
+	pointer-events: auto;
+	position: static;
 }
 
-/* Navigation icons */
-.nav-icon {
-	width: 20px;
-	height: 20px;
-	filter: brightness(0) invert(1);
-	flex-shrink: 0;
-	opacity: 0.5;
+/* При раскрытии - обычная позиция */
+.sidebar--expanded .nav-icon {
+	position: static;
+	left: auto;
+	top: auto;
+	transform: none;
+	margin: 0;
 }
 
 .nav-button--primary .nav-icon {
@@ -253,7 +320,6 @@
 
 .room-item:hover {
 	background-color: #2A2A2A;
-	transform: translateY(-1px);
 }
 
 .room-icon {
@@ -281,21 +347,23 @@
 
 /* Sidebar footer */
 .sidebar-footer {
-	padding: 20px 16px;
+	padding: 16px 16px 8px;
 	border-top: 1px solid #2A2A2A;
 	display: flex;
 	flex-direction: column;
 	gap: 12px;
 	flex-shrink: 0; /* Предотвращаем сжатие footer */
+	/* На мобильных добавляем отступ снизу для безопасной зоны */
+	margin-bottom: 0;
 }
 
 .sidebar--expanded .sidebar-footer {
-	padding: 20px;
+	padding: 16px 20px 8px;
 }
 
 /* Дополнительный отступ снизу для мобильных устройств */
 .sidebar--mobile .sidebar-footer {
-	padding-bottom: 30px; /* Больше отступа для удобства прокрутки */
+	padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px)); /* Отступ + безопасная зона снизу */
 }
 
 /* User info */
@@ -327,6 +395,48 @@
 	font-weight: 600;
 	font-size: 14px;
 	line-height: 1.2;
+}
+
+/* Company info */
+.company-info {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	padding: 8px 12px 4px;
+	margin-top: 4px;
+	border-top: 1px solid #2A2A2A;
+	text-align: center;
+}
+
+.company-name {
+	color: #7E7E7E;
+	font-family: 'Gilroy', sans-serif;
+	font-weight: 500;
+	font-size: 11px;
+	line-height: 1.2;
+}
+
+.app-version {
+	color: #FEB1FF;
+	font-family: 'Gilroy', sans-serif;
+	font-weight: 600;
+	font-size: 10px;
+	line-height: 1.2;
+}
+
+.sidebar--mini .company-info {
+	padding: 6px 4px 2px;
+}
+
+.sidebar--mini .company-name {
+	font-size: 0;
+	height: 0;
+	opacity: 0;
+	overflow: hidden;
+}
+
+.sidebar--mini .app-version {
+	font-size: 8px;
 }
 
 

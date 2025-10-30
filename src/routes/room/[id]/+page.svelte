@@ -5,6 +5,7 @@
 	import RightSidebar from '$lib/components/room/RightSidebar.svelte';
 	import NoteEditor from '$lib/components/room/NoteEditor.svelte';
 	import NotePlaceholder from '$lib/components/room/NotePlaceholder.svelte';
+	import NotesGrid from '$lib/components/room/NotesGrid.svelte';
 	import RoomLoading from '$lib/components/room/RoomLoading.svelte';
 	import RoomErrorPlaceholder from '$lib/components/room/RoomErrorPlaceholder.svelte';
 	import EditNoteTitleModal from '$lib/components/ui/EditNoteTitleModal.svelte';
@@ -15,6 +16,7 @@
 	import { getRoom, updateRoom, type Room } from '$lib/rooms';
 	import { openSingleUserWidget } from '$lib/api/user-management';
 	import { getNotificationsClient } from '$lib/notifications-client';
+	import { ActiveEditorTracker, getActiveEditors, type ActiveEditor } from '$lib/utils/activeEditors';
 
 	// Получаем ID комнаты из параметров маршрута
 	const roomId = $derived($page.params.id);
@@ -42,6 +44,8 @@
 	let isLoading = $state(true);
 	let isSidebarCollapsed = $state(true);
 	let showLoading = $state(true);
+	let showLoadingAnimation = $state(false); // Флаг для показа анимации вместо статичного логотипа
+	let contentVisible = $state(false); // Флаг для плавного появления контента после анимации
 	let error = $state('');
 	let selectedNoteId = $state<string | undefined>(undefined);
 	let isEditModalOpen = $state(false);
@@ -56,6 +60,15 @@
 	let canDelete = $state(false);
 	let canInvite = $state(false);
 	let canManageRoom = $state(false);
+	
+	// Map для отслеживания активных редакторов по заметкам
+	let activeEditorsMap = $state(new Map<string, ActiveEditor[]>());
+	
+	// Tracker для отслеживания активности редактирования
+	let editorTracker: ActiveEditorTracker | null = null;
+	
+	// Интервал для обновления списка активных редакторов
+	let activeEditorsInterval: number | null = null;
 	
 	// Функция для отключения WebSocket
 	let disconnectOnlineTracking: (() => void) | null = null;
@@ -153,6 +166,9 @@
 	} else {
 		roomData.participants = participantsResult.participants as Participant[];
 	}
+	
+	// Показываем анимацию с фигурами только после загрузки участников
+	showLoadingAnimation = true;
 
 		// Загружаем права доступа параллельно с обновлением онлайн статуса
 		if ($currentUser?.id) {
@@ -186,9 +202,22 @@
 			};
 		}
 
-		// Убираем искусственную задержку - показываем UI сразу
+		// Убираем искусственную задержку - запускаем анимацию завершения
 		showLoading = false;
 		isLoading = false;
+		
+		// Показываем контент после завершения анимации zoom
+		setTimeout(() => {
+			contentVisible = true;
+		}, 700); // Даем время для проигрывания анимации приближения
+		
+		// Запускаем периодическое обновление списка активных редакторов для всех заметок
+		activeEditorsInterval = window.setInterval(async () => {
+			await updateAllActiveEditors();
+		}, 15000); // Обновляем каждые 15 секунд
+		
+		// Первое обновление сразу
+		await updateAllActiveEditors();
 		} catch (err) {
 			console.error('Unexpected error loading room data:', err);
 			error = 'Ошибка загрузки данных комнаты';
@@ -210,6 +239,16 @@
 		
 		if (disconnectOnlineTracking) {
 			disconnectOnlineTracking();
+		}
+		
+		// Останавливаем отслеживание активных редакторов
+		if (editorTracker) {
+			await editorTracker.stop();
+		}
+		
+		// Очищаем интервал обновления активных редакторов
+		if (activeEditorsInterval !== null) {
+			clearInterval(activeEditorsInterval);
 		}
 	});
 
@@ -236,8 +275,16 @@
 		// TODO: Implement room sharing logic
 	}
 
-	function handleNoteClick(noteId: string) {
+	async function handleNoteClick(noteId: string) {
 		selectedNoteId = noteId;
+		
+		// Переключаем отслеживание активных редакторов на новую заметку
+		if (editorTracker) {
+			await editorTracker.switchNote(noteId);
+		} else {
+			editorTracker = new ActiveEditorTracker(noteId);
+			await editorTracker.start();
+		}
 	}
 
 	function handleNoteContentChange(noteId: string, content: string) {
@@ -468,10 +515,35 @@
 		}
 	}
 
+	// Функция для обновления активных редакторов для всех заметок
+	async function updateAllActiveEditors() {
+		if (!roomData.notes || roomData.notes.length === 0) return;
+		
+		const newActiveEditorsMap = new Map<string, ActiveEditor[]>();
+		
+		// Запрашиваем активных редакторов для каждой заметки
+		await Promise.all(
+			roomData.notes.map(async (note) => {
+				const { editors } = await getActiveEditors(note.id);
+				if (editors.length > 0) {
+					// Фильтруем текущего пользователя из списка
+					const filteredEditors = editors.filter(editor => editor.id !== $currentUser?.id);
+					if (filteredEditors.length > 0) {
+						newActiveEditorsMap.set(note.id, filteredEditors);
+					}
+				}
+			})
+		);
+		
+		activeEditorsMap = newActiveEditorsMap;
+	}
+	
 	async function handleRetry() {
 		error = '';
 		isLoading = true;
 		showLoading = true;
+		showLoadingAnimation = false; // Сбрасываем анимацию при повторной попытке
+		contentVisible = false; // Скрываем контент при повторной попытке
 		
 		try {
 			if (!roomId) {
@@ -517,6 +589,9 @@
 			} else {
 				roomData.participants = participantsResult.participants as Participant[];
 			}
+			
+			// Показываем анимацию с фигурами только после загрузки участников
+			showLoadingAnimation = true;
 
 			if ($currentUser?.id) {
 				const [permissionsResult] = await Promise.all([
@@ -534,6 +609,11 @@
 
 			showLoading = false;
 			isLoading = false;
+			
+			// Показываем контент после завершения анимации zoom
+			setTimeout(() => {
+				contentVisible = true;
+			}, 700);
 		} catch (err) {
 			error = 'Ошибка загрузки данных комнаты';
 			isLoading = false;
@@ -543,10 +623,12 @@
 
 <div class="room-page">
 	<div class="room-layout" class:sidebar-collapsed={isSidebarCollapsed}>
-		{#if isLoading}
-			<RoomLoading isVisible={showLoading} />
+		{#if isLoading || !contentVisible}
+			<RoomLoading isVisible={showLoading} showAnimation={showLoadingAnimation} />
 		{/if}
 		
+		{#if contentVisible}
+		<div class="room-content-wrapper" class:room-content-wrapper--visible={contentVisible}>
 		{#if error}
 			<RoomErrorPlaceholder 
 				error={error}
@@ -585,14 +667,30 @@
 									onContentChange={handleNoteContentChange}
 								/>
 							{:else}
-								<NotePlaceholder canEdit={canEdit} onCreateNote={handleCreateNote} />
+								<NotesGrid 
+									notes={roomData.notes}
+									selectedNoteId={selectedNoteId}
+									canEdit={canEdit}
+									onNoteClick={handleNoteClick}
+									onCreateNote={handleCreateNote}
+									activeEditorsMap={activeEditorsMap}
+								/>
 							{/if}
 						{:else}
-							<NotePlaceholder canEdit={canEdit} onCreateNote={handleCreateNote} />
+							<NotesGrid 
+								notes={roomData.notes}
+								selectedNoteId={selectedNoteId}
+								canEdit={canEdit}
+								onNoteClick={handleNoteClick}
+								onCreateNote={handleCreateNote}
+								activeEditorsMap={activeEditorsMap}
+							/>
 						{/if}
 					{/if}
 				</main>
 			</div>
+		{/if}
+		</div>
 		{/if}
 	</div>
 	
@@ -630,6 +728,20 @@
 		background-color: #121212;
 	}
 
+	/* Обертка контента с плавным появлением */
+	.room-content-wrapper {
+		opacity: 0;
+		transform: translateY(10px);
+		transition: opacity 0.5s ease, transform 0.5s ease;
+		width: 100%;
+		height: 100%;
+		display: contents;
+	}
+	
+	.room-content-wrapper--visible {
+		opacity: 1;
+		transform: translateY(0);
+	}
 
 	.room-layout {
 		flex: 1;

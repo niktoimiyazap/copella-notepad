@@ -23,28 +23,64 @@ export const POST: RequestHandler = async (event) => {
 			return json({ error: authError?.message || 'Invalid credentials' }, { status: 401 });
 		}
 
-	console.log('Supabase auth successful for:', email);
+	const authTime = Date.now();
+	console.log('[Login] Supabase auth successful for:', email);
 
-	// 2. Проверяем/создаем пользователя в локальной БД (с автоматическим retry)
-	let dbUser = await withRetry(() => 
-		prisma.user.findUnique({
-			where: { id: authData.user.id }
-		})
-	);
+	// 2. Проверяем/создаем пользователя в локальной БД (с таймаутом)
+	let dbUser;
+	const dbStartTime = Date.now();
+	try {
+		console.log('[Login] Starting database lookup...');
+		// Добавляем таймаут для предотвращения бесконечного ожидания
+		const findUserWithTimeout = Promise.race([
+			withRetry(() => 
+				prisma.user.findUnique({
+					where: { id: authData.user.id }
+				})
+			),
+			new Promise((_, reject) => 
+				setTimeout(() => reject(new Error('Database timeout')), 5000)
+			)
+		]);
 
-	if (!dbUser) {
-		// Создаем пользователя если его нет (с автоматическим retry)
-		dbUser = await withRetry(() =>
-			prisma.user.create({
-				data: {
-					id: authData.user.id,
-					email: authData.user.email || '',
-					fullName: authData.user.user_metadata?.full_name || email.split('@')[0],
-					username: authData.user.user_metadata?.username || email.split('@')[0],
-					avatarUrl: authData.user.user_metadata?.avatar_url
-				}
-			})
-		);
+		dbUser = await findUserWithTimeout as any;
+		console.log(`[Login] Database lookup completed in ${Date.now() - dbStartTime}ms`);
+
+		if (!dbUser) {
+			console.log('[Login] User not found, creating new user...');
+			// Создаем пользователя если его нет (с таймаутом)
+			const createUserWithTimeout = Promise.race([
+				withRetry(() =>
+					prisma.user.create({
+						data: {
+							id: authData.user.id,
+							email: authData.user.email || '',
+							fullName: authData.user.user_metadata?.full_name || email.split('@')[0],
+							username: authData.user.user_metadata?.username || email.split('@')[0],
+							avatarUrl: authData.user.user_metadata?.avatar_url
+						}
+					})
+				),
+				new Promise((_, reject) => 
+					setTimeout(() => reject(new Error('Database timeout')), 5000)
+				)
+			]);
+
+			dbUser = await createUserWithTimeout as any;
+			console.log(`[Login] User created in ${Date.now() - dbStartTime}ms`);
+		} else {
+			console.log('[Login] User found in database');
+		}
+	} catch (dbError) {
+		console.error(`[Login] Database error after ${Date.now() - dbStartTime}ms, using Supabase fallback:`, dbError);
+		// Fallback: используем данные из Supabase если БД недоступна
+		dbUser = {
+			id: authData.user.id,
+			email: authData.user.email || '',
+			fullName: authData.user.user_metadata?.full_name || email.split('@')[0],
+			username: authData.user.user_metadata?.username || email.split('@')[0],
+			avatarUrl: authData.user.user_metadata?.avatar_url || null
+		};
 	}
 
 		// 3. Создаем сессию в cookie

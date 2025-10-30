@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { currentUser } from '$lib/stores/user';
+	import { getOptimizedRoomCover } from '$lib/utils/imageOptimization';
 
 	// RoomCard component props
 	interface Props {
@@ -22,8 +23,16 @@
 	// Состояние для анимации удаления
 	let isDeleting = $state(false);
 	
+	// Состояние загрузки изображения
+	let imageLoaded = $state(false);
+	let imageError = $state(false);
+	
 	// Проверяем, является ли текущий пользователь владельцем комнаты
 	let isUserOwner = $derived($currentUser?.id === room.isOwner);
+	
+	// Оптимизированный URL обложки (разный размер для обычных и больших карточек)
+	const coverSize = $derived(room.isLarge ? 'medium' : 'small');
+	const optimizedCoverUrl = $derived(getOptimizedRoomCover(room.image, coverSize));
 	
 	function handleClick() {
 		onClick?.(room.id);
@@ -44,6 +53,14 @@
 			}, 300);
 		}
 	}
+	
+	function handleImageLoad() {
+		imageLoaded = true;
+	}
+	
+	function handleImageError() {
+		imageError = true;
+	}
 </script>
 
 <div 
@@ -57,8 +74,21 @@
 >
 	<!-- Карточка комнаты -->
 	<div class="room-image-container">
-		{#if room.image}
-			<img src={room.image} alt={room.name} class="room-image" />
+		{#if optimizedCoverUrl && !imageError}
+			<!-- Blur placeholder пока изображение загружается -->
+			{#if !imageLoaded}
+				<div class="room-image-skeleton"></div>
+			{/if}
+			<img 
+				src={optimizedCoverUrl} 
+				alt={room.name} 
+				class="room-image"
+				class:room-image--loaded={imageLoaded}
+				loading="lazy"
+				decoding="async"
+				onload={handleImageLoad}
+				onerror={handleImageError}
+			/>
 		{:else}
 			<div class="room-image-placeholder">
 				<img src="/icons/message-circle.svg" alt="Room" class="room-icon" />
@@ -171,6 +201,37 @@
 		width: 100%;
 		height: 100%;
 		object-fit: cover;
+		opacity: 0;
+		transition: opacity 0.3s ease-in-out;
+	}
+	
+	.room-image--loaded {
+		opacity: 1;
+	}
+	
+	.room-image-skeleton {
+		position: absolute;
+		top: 0;
+		left: 0;
+		width: 100%;
+		height: 100%;
+		background: linear-gradient(
+			90deg,
+			#1a1a1a 0%,
+			#242424 50%,
+			#1a1a1a 100%
+		);
+		background-size: 200% 100%;
+		animation: shimmer 1.5s infinite;
+	}
+	
+	@keyframes shimmer {
+		0% {
+			background-position: 200% 0;
+		}
+		100% {
+			background-position: -200% 0;
+		}
 	}
 	
 	.room-image-placeholder {

@@ -22,7 +22,11 @@
 	
 	async function loadPrivacySettings() {
 		try {
-			const response = await fetch('/api/settings/privacy');
+			const token = localStorage.getItem('session_token');
+			const response = await fetch('/api/settings/privacy', {
+				headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+				credentials: 'include'
+			});
 			if (response.ok) {
 				const data = await response.json();
 				profileVisibility = data.profileVisibility ?? 'public';
@@ -41,9 +45,14 @@
 		message = null;
 		
 		try {
+			const token = localStorage.getItem('session_token');
 			const response = await fetch('/api/settings/privacy', {
 				method: 'PATCH',
-				headers: { 'Content-Type': 'application/json' },
+				headers: { 
+					'Content-Type': 'application/json',
+					...(token ? { 'Authorization': `Bearer ${token}` } : {})
+				},
+				credentials: 'include',
 				body: JSON.stringify({
 					profileVisibility,
 					showOnlineStatus,

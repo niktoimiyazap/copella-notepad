@@ -355,12 +355,42 @@
 		gap: 12px;
 		position: relative;
 		z-index: 20;
+		/* Разрешаем прокрутку контейнера, если нужно */
+		overflow-x: hidden;
+		overflow-y: visible;
 	}
 
 	.format-buttons {
 		display: flex;
 		gap: 6px;
 		align-items: center;
+		/* Разрешаем прокрутку на всех разрешениях экрана */
+		overflow-x: auto;
+		overflow-y: visible;
+		width: 100%;
+		/* Плавная прокрутка */
+		-webkit-overflow-scrolling: touch;
+		/* Показываем скроллбар для прокрутки мышкой */
+		scrollbar-width: thin; /* Firefox */
+		scrollbar-color: rgba(254, 177, 255, 0.3) transparent; /* Firefox */
+	}
+
+	/* Стилизация скроллбара для прокрутки мышкой */
+	.format-buttons::-webkit-scrollbar {
+		height: 6px; /* Chrome, Safari, Opera */
+	}
+
+	.format-buttons::-webkit-scrollbar-track {
+		background: transparent;
+	}
+
+	.format-buttons::-webkit-scrollbar-thumb {
+		background-color: rgba(254, 177, 255, 0.3);
+		border-radius: 3px;
+	}
+
+	.format-buttons::-webkit-scrollbar-thumb:hover {
+		background-color: rgba(254, 177, 255, 0.5);
 	}
 
 	/* Группы кнопок */
@@ -378,6 +408,7 @@
 		background-color: #3A3A3A;
 		margin: 0 8px;
 		opacity: 0.6;
+		flex-shrink: 0; /* Предотвратить сжатие разделителей при прокрутке */
 	}
 
 	/* Компактные кнопки для панели форматирования */
@@ -410,17 +441,31 @@
 			overflow-y: visible;
 			width: 100%;
 			padding-right: 8px;
-			/* Скрыть скроллбар для более чистого вида */
+			/* Плавная прокрутка на мобильных */
 			-webkit-overflow-scrolling: touch;
-			scrollbar-width: none; /* Firefox */
-			-ms-overflow-style: none; /* IE and Edge */
+			/* На мобильных можно скрыть скроллбар, но прокрутка мышкой должна работать */
+			scrollbar-width: thin; /* Firefox - тонкий скроллбар */
+			scrollbar-color: rgba(254, 177, 255, 0.2) transparent; /* Firefox */
 		}
 
 		.format-buttons::-webkit-scrollbar {
-			display: none; /* Chrome, Safari, Opera */
+			height: 4px; /* Chrome, Safari, Opera - тонкий скроллбар на мобильных */
 		}
 
-		/* Визуальная подсказка о возможности скролла */
+		.format-buttons::-webkit-scrollbar-track {
+			background: transparent;
+		}
+
+		.format-buttons::-webkit-scrollbar-thumb {
+			background-color: rgba(254, 177, 255, 0.2);
+			border-radius: 2px;
+		}
+
+		.format-buttons::-webkit-scrollbar-thumb:hover {
+			background-color: rgba(254, 177, 255, 0.4);
+		}
+
+		/* Визуальная подсказка о возможности скролла (только если есть контент для прокрутки) */
 		.format-buttons.show-scroll-hint::after {
 			content: '';
 			position: absolute;
@@ -446,9 +491,6 @@
 			height: 12px;
 		}
 
-		.toolbar-separator {
-			flex-shrink: 0; /* Предотвратить сжатие разделителей */
-		}
 		
 	}
 
@@ -479,6 +521,7 @@
 	.button-group {
 		flex-shrink: 0;
 	}
+
 
 	/* Стили для отключенного состояния тулбара */
 	.editor-toolbar.disabled {

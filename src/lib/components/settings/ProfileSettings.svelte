@@ -1,6 +1,8 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import UserAvatar from '../UserAvatar.svelte';
+	import { userActions } from '$lib/stores/user';
+	import { compressImage, IMAGE_PRESETS } from '$lib/utils/imageOptimization';
 	
 	interface Props {
 		user: any;
@@ -20,29 +22,32 @@
 		message = null;
 		
 		try {
-			const token = document.cookie
-				.split('; ')
-				.find(row => row.startsWith('sb-access-token='))
-				?.split('=')[1];
+			const token = localStorage.getItem('session_token');
 			
 			const response = await fetch('/api/auth/profile', {
 				method: 'PATCH',
 				headers: { 
 					'Content-Type': 'application/json',
-					'Authorization': `Bearer ${token}`
+					...(token ? { 'Authorization': `Bearer ${token}` } : {})
 				},
+				credentials: 'include',
 				body: JSON.stringify({
 					displayName,
 					username
 				})
 			});
 			
-			if (response.ok) {
-				message = { type: 'success', text: 'Профиль успешно обновлен' };
-				// Обновляем данные пользователя
-				const updatedUser = await response.json();
-				Object.assign(user, updatedUser);
-			} else {
+		if (response.ok) {
+			message = { type: 'success', text: 'Профиль успешно обновлен' };
+			// Обновляем данные пользователя
+			const updatedUser = await response.json();
+			Object.assign(user, updatedUser);
+			// Обновляем глобальный стор пользователя
+			userActions.updateUser({ 
+				fullName: updatedUser.displayName,
+				username: updatedUser.username 
+			});
+		} else {
 				const error = await response.json();
 				message = { type: 'error', text: error.error || 'Ошибка при обновлении профиля' };
 			}
@@ -75,31 +80,42 @@
 		message = null;
 		
 		try {
-			const token = document.cookie
-				.split('; ')
-				.find(row => row.startsWith('sb-access-token='))
-				?.split('=')[1];
+			const token = localStorage.getItem('session_token');
+			
+			// Сжимаем изображение перед загрузкой
+			message = { type: 'success', text: 'Оптимизация изображения...' };
+			const compressedBlob = await compressImage(
+				file,
+				IMAGE_PRESETS.avatar.maxWidth,
+				IMAGE_PRESETS.avatar.maxHeight,
+				IMAGE_PRESETS.avatar.quality
+			);
 			
 			const formData = new FormData();
-			formData.append('avatar', file);
+			formData.append('avatar', compressedBlob, 'avatar.jpg');
 			
+			message = { type: 'success', text: 'Загрузка...' };
 			const response = await fetch('/api/upload/avatar', {
 				method: 'POST',
-				headers: {
+				headers: token ? {
 					'Authorization': `Bearer ${token}`
-				},
+				} : {},
+				credentials: 'include',
 				body: formData
 			});
 			
-			if (response.ok) {
-				const data = await response.json();
-				user.avatarUrl = data.avatarUrl;
-				message = { type: 'success', text: 'Аватар успешно обновлен' };
-			} else {
+		if (response.ok) {
+			const data = await response.json();
+			user.avatarUrl = data.avatarUrl;
+			// Обновляем глобальный стор пользователя
+			userActions.updateUser({ avatarUrl: data.avatarUrl });
+			message = { type: 'success', text: 'Аватар успешно обновлен' };
+		} else {
 				const error = await response.json();
 				message = { type: 'error', text: error.error || 'Ошибка при загрузке аватара' };
 			}
 		} catch (error) {
+			console.error('Avatar upload error:', error);
 			message = { type: 'error', text: 'Произошла ошибка при загрузке' };
 		} finally {
 			uploadingAvatar = false;
@@ -113,22 +129,22 @@
 		message = null;
 		
 		try {
-			const token = document.cookie
-				.split('; ')
-				.find(row => row.startsWith('sb-access-token='))
-				?.split('=')[1];
+			const token = localStorage.getItem('session_token');
 			
 			const response = await fetch('/api/upload/avatar', {
 				method: 'DELETE',
-				headers: {
+				headers: token ? {
 					'Authorization': `Bearer ${token}`
-				}
+				} : {},
+				credentials: 'include'
 			});
 			
-			if (response.ok) {
-				user.avatarUrl = null;
-				message = { type: 'success', text: 'Аватар удален' };
-			} else {
+		if (response.ok) {
+			user.avatarUrl = null;
+			// Обновляем глобальный стор пользователя
+			userActions.updateUser({ avatarUrl: null });
+			message = { type: 'success', text: 'Аватар удален' };
+		} else {
 				const error = await response.json();
 				message = { type: 'error', text: error.error || 'Ошибка при удалении аватара' };
 			}

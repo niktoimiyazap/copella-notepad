@@ -173,9 +173,32 @@ export interface RoomsResult {
 	error?: string;
 }
 
-// Функция для получения всех комнат пользователя
-export async function getUserRooms(): Promise<RoomsResult> {
+// Функция для получения всех комнат пользователя с кэшированием
+export async function getUserRooms(useCache: boolean = true): Promise<RoomsResult> {
 	try {
+		// Пытаемся получить из кэша для быстрой загрузки
+		if (useCache && browser) {
+			const cacheKey = 'rooms_cache';
+			const cacheTimestampKey = 'rooms_cache_timestamp';
+			const cacheMaxAge = 30000; // 30 секунд кэш
+			
+			const cachedData = localStorage.getItem(cacheKey);
+			const cachedTimestamp = localStorage.getItem(cacheTimestampKey);
+			
+			if (cachedData && cachedTimestamp) {
+				const age = Date.now() - parseInt(cachedTimestamp, 10);
+				if (age < cacheMaxAge) {
+					try {
+						const rooms = JSON.parse(cachedData);
+						// Возвращаем кэшированные данные сразу для мгновенной загрузки
+						return { rooms };
+					} catch (e) {
+						// Если ошибка парсинга, продолжаем обычную загрузку
+					}
+				}
+			}
+		}
+
 		// Получаем токен авторизации
 		const token = await getAuthToken();
 		if (!token) {
@@ -194,6 +217,16 @@ export async function getUserRooms(): Promise<RoomsResult> {
 
 		if (!response.ok) {
 			return { error: result.error || 'Ошибка получения комнат' };
+		}
+
+		// Сохраняем в кэш для последующих загрузок
+		if (browser && result.rooms) {
+			try {
+				localStorage.setItem('rooms_cache', JSON.stringify(result.rooms));
+				localStorage.setItem('rooms_cache_timestamp', Date.now().toString());
+			} catch (e) {
+				// Игнорируем ошибки localStorage (quota exceeded и т.д.)
+			}
 		}
 
 		return { rooms: result.rooms };

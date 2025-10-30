@@ -137,15 +137,17 @@
 	class:right-sidebar--mobile-open={isMobile && isOpen}
 	bind:this={sidebarElement}
 >
+	{#if !isMobile}
+		<button class="toggle-btn" onclick={toggleCollapse} title={isCollapsed ? 'Развернуть' : 'Свернуть'}>
+			<svg class="chevron-icon" class:rotated={!isCollapsed} viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+				<path d="M15 18l-6-6 6-6"/>
+			</svg>
+		</button>
+	{/if}
+	
 	<!-- Заголовок с кнопкой сворачивания -->
 	<div class="sidebar-header">
-		{#if !isMobile}
-			<button class="toggle-btn" onclick={toggleCollapse} title={isCollapsed ? 'Развернуть' : 'Свернуть'}>
-				<svg class="chevron-icon" class:rotated={!isCollapsed} viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-					<path d="M15 18l-6-6 6-6"/>
-				</svg>
-			</button>
-		{:else}
+		{#if isMobile}
 			<h2 class="sidebar-mobile-title">Панель</h2>
 		{/if}
 	</div>
@@ -210,7 +212,10 @@
 						</div>
 						{#if !isCollapsed || isMobile}
 							<div class="participant-info">
-								<span class="name">{participant.user.username}</span>
+								<div class="participant-names">
+									<span class="name">{participant.user.fullName || participant.user.username}</span>
+									<span class="username">@{participant.user.username}</span>
+								</div>
 								{#if participant.role === 'creator' || participant.role === 'owner'}
 									<span class="role role--creator">{getRoleDisplayName(participant.role)}</span>
 								{:else if participant.role === 'admin'}
@@ -332,8 +337,9 @@
 		display: flex;
 		flex-direction: column;
 		z-index: 100;
-		transition: width 0.3s ease;
+		transition: width 0.18s cubic-bezier(0.4, 0.0, 0.2, 1);
 		box-shadow: -2px 0 10px rgba(0, 0, 0, 0.1);
+		overflow: visible;
 	}
 
 	.right-sidebar.collapsed {
@@ -344,7 +350,9 @@
 		padding: 16px;
 		border-bottom: 1px solid #2a2a2a;
 		display: flex;
-		justify-content: flex-end;
+		justify-content: flex-start;
+		overflow: visible;
+		position: relative;
 	}
 
 	.right-sidebar.collapsed:not(.right-sidebar--mobile) .sidebar-header {
@@ -367,37 +375,48 @@
 	}
 
 	.toggle-btn {
-		width: 40px;
-		height: 40px;
-		background: #242424;
-		border: none;
-		border-radius: 12px;
+		width: 24px;
+		height: 48px;
+		background: #1A1A1A;
+		border: 1px solid #2A2A2A;
+		border-right: none;
+		border-radius: 8px 0 0 8px;
 		display: flex;
 		align-items: center;
 		justify-content: center;
 		cursor: pointer;
-		transition: all 0.2s ease;
-		position: relative;
-		overflow: hidden;
+		transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+		position: absolute;
+		top: 20px;
+		left: -24px;
+		flex-shrink: 0;
+		padding: 0;
+		z-index: 10;
 	}
 
 	.toggle-btn:hover {
-		background: #2a2a2a;
-		transform: translateY(-1px);
+		background: #242424;
+		border-color: #3A3A3A;
+		transform: translateX(-2px);
+	}
+
+	.toggle-btn:active {
+		transform: translateX(0);
+	}
+
+	.chevron-icon {
+		width: 14px;
+		height: 14px;
+		color: #7e7e7e;
+		transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+		filter: brightness(0) invert(1);
+		opacity: 0.6;
 	}
 
 	.toggle-btn:hover .chevron-icon {
 		opacity: 1;
-		transform: scale(1.1);
-	}
-
-	.chevron-icon {
-		width: 20px;
-		height: 20px;
-		color: #7e7e7e;
-		transition: transform 0.3s ease;
+		color: #FEB1FF;
 		filter: brightness(0) invert(1);
-		opacity: 0.5;
 	}
 
 	.chevron-icon.rotated {
@@ -429,15 +448,27 @@
 		font-size: 14px;
 		color: #ffffff;
 		margin: 0;
-		opacity: 1;
-		transition: opacity 0.2s ease;
+		white-space: nowrap;
+		transition: 
+			opacity 0.15s cubic-bezier(0.4, 0.0, 0.2, 1),
+			height 0.18s cubic-bezier(0.4, 0.0, 0.2, 1);
 	}
 
 	.right-sidebar.collapsed .section-title {
 		opacity: 0;
 		height: 0;
 		overflow: hidden;
-		transition: opacity 0.2s ease 0.1s, height 0.2s ease 0.1s;
+		transition: 
+			opacity 0.1s cubic-bezier(0.4, 0.0, 0.2, 1),
+			height 0.18s cubic-bezier(0.4, 0.0, 0.2, 1);
+	}
+
+	.right-sidebar:not(.collapsed) .section-title {
+		opacity: 1;
+		height: auto;
+		transition: 
+			opacity 0.2s cubic-bezier(0.4, 0.0, 0.2, 1) 0.08s,
+			height 0.18s cubic-bezier(0.4, 0.0, 0.2, 1);
 	}
 
 	.participants-list,
@@ -554,18 +585,14 @@
 		background: transparent;
 		border: none;
 		border-radius: 12px;
-		transition: all 0.2s ease;
+		transition: 
+			background-color 0.2s cubic-bezier(0.4, 0.0, 0.2, 1),
+			color 0.2s cubic-bezier(0.4, 0.0, 0.2, 1);
 		position: relative;
 		overflow: hidden;
 		cursor: pointer;
 		width: 100%;
 		text-align: left;
-	}
-
-	.participant-item:hover,
-	.note-item:hover,
-	.create-note-item:hover {
-		transform: translateY(-1px);
 	}
 
 	.participant-item.collapsed,
@@ -591,7 +618,6 @@
 	.note-button:hover {
 		background: #2a2a2a;
 		color: #ffffff;
-		transform: translateY(-1px);
 	}
 
 	/* Переопределяем стили для выбранной заметки */
@@ -619,6 +645,20 @@
 		transform: translate(-50%, -50%);
 		width: 20px;
 		height: 20px;
+		opacity: 0;
+		animation: iconReappear 0.1s cubic-bezier(0.4, 0.0, 0.2, 1) 0.1s forwards;
+	}
+
+	.note-button:not(.collapsed) .btn-icon {
+		opacity: 0;
+		transition: opacity 0.08s cubic-bezier(0.4, 0.0, 0.2, 1);
+		animation: iconReappear 0.1s cubic-bezier(0.4, 0.0, 0.2, 1) 0.12s forwards;
+	}
+
+	@keyframes iconReappear {
+		to {
+			opacity: 1;
+		}
 	}
 
 	/* Стили для действий с заметками */
@@ -630,7 +670,7 @@
 		display: flex;
 		gap: 4px;
 		opacity: 0;
-		transition: all 0.2s ease;
+		transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 	}
 
 	.note-item:hover .note-actions {
@@ -648,7 +688,7 @@
 		align-items: center;
 		justify-content: center;
 		cursor: pointer;
-		transition: all 0.2s ease;
+		transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 	}
 
 	.edit-button:hover {
@@ -706,20 +746,56 @@
 		align-items: flex-start;
 	}
 
-	.name {
-		font-family: 'Gilroy', sans-serif;
-		font-weight: 500;
-		font-size: 14px;
-		color: #7e7e7e;
-		opacity: 1;
-		transition: opacity 0.2s ease;
+	.participant-names {
+		display: flex;
+		flex-direction: column;
+		gap: 2px;
+		min-width: 0;
+		width: 100%;
 	}
 
-	.participant-item.collapsed .name {
+	.name {
+		font-family: 'Gilroy', sans-serif;
+		font-weight: 600;
+		font-size: 14px;
+		color: #ffffff;
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		transition: 
+			opacity 0.15s cubic-bezier(0.4, 0.0, 0.2, 1),
+			width 0.18s cubic-bezier(0.4, 0.0, 0.2, 1);
+	}
+
+	.username {
+		font-family: 'Gilroy', sans-serif;
+		font-weight: 600;
+		font-size: 11px;
+		color: #7e7e7e;
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		transition: 
+			opacity 0.15s cubic-bezier(0.4, 0.0, 0.2, 1),
+			width 0.18s cubic-bezier(0.4, 0.0, 0.2, 1);
+	}
+
+	.participant-item.collapsed .participant-names {
 		opacity: 0;
 		width: 0;
 		overflow: hidden;
-		transition: opacity 0.2s ease 0.1s, width 0.2s ease 0.1s;
+		transition: 
+			opacity 0.1s cubic-bezier(0.4, 0.0, 0.2, 1),
+			width 0.18s cubic-bezier(0.4, 0.0, 0.2, 1);
+	}
+
+	.participant-item:not(.collapsed) .name,
+	.participant-item:not(.collapsed) .username {
+		opacity: 1;
+		width: auto;
+		transition: 
+			opacity 0.2s cubic-bezier(0.4, 0.0, 0.2, 1) 0.08s,
+			width 0.18s cubic-bezier(0.4, 0.0, 0.2, 1);
 	}
 
 	.role {
@@ -728,8 +804,9 @@
 		font-size: 11px;
 		padding: 6px 12px;
 		border-radius: 14px;
-		opacity: 1;
-		transition: opacity 0.2s ease;
+		transition: 
+			opacity 0.15s cubic-bezier(0.4, 0.0, 0.2, 1),
+			width 0.18s cubic-bezier(0.4, 0.0, 0.2, 1);
 		text-transform: none;
 		letter-spacing: 0;
 		width: auto;
@@ -766,7 +843,17 @@
 		opacity: 0;
 		width: 0;
 		overflow: hidden;
-		transition: opacity 0.2s ease 0.1s, width 0.2s ease 0.1s;
+		transition: 
+			opacity 0.1s cubic-bezier(0.4, 0.0, 0.2, 1),
+			width 0.18s cubic-bezier(0.4, 0.0, 0.2, 1);
+	}
+
+	.participant-item:not(.collapsed) .role {
+		opacity: 1;
+		width: auto;
+		transition: 
+			opacity 0.2s cubic-bezier(0.4, 0.0, 0.2, 1) 0.08s,
+			width 0.18s cubic-bezier(0.4, 0.0, 0.2, 1);
 	}
 
 	.note-content {
@@ -775,16 +862,28 @@
 		gap: 4px;
 		flex: 1;
 		min-width: 0;
-		opacity: 1;
-		transition: opacity 0.2s ease;
+		white-space: nowrap;
 		margin-left: 12px;
+		transition: 
+			opacity 0.15s cubic-bezier(0.4, 0.0, 0.2, 1),
+			width 0.18s cubic-bezier(0.4, 0.0, 0.2, 1);
 	}
 
 	.note-button.collapsed .note-content {
 		opacity: 0;
 		width: 0;
 		overflow: hidden;
-		transition: opacity 0.2s ease 0.1s, width 0.2s ease 0.1s;
+		transition: 
+			opacity 0.1s cubic-bezier(0.4, 0.0, 0.2, 1),
+			width 0.18s cubic-bezier(0.4, 0.0, 0.2, 1);
+	}
+
+	.note-button:not(.collapsed) .note-content {
+		opacity: 1;
+		width: auto;
+		transition: 
+			opacity 0.2s cubic-bezier(0.4, 0.0, 0.2, 1) 0.08s,
+			width 0.18s cubic-bezier(0.4, 0.0, 0.2, 1);
 	}
 
 	.note-title {
@@ -828,6 +927,20 @@
 		transform: translate(-50%, -50%);
 		width: 20px;
 		height: 20px;
+		opacity: 0;
+		animation: iconReappearCreate 0.1s cubic-bezier(0.4, 0.0, 0.2, 1) 0.1s forwards;
+	}
+
+	.create-note-button:not(.collapsed) .btn-icon {
+		opacity: 0;
+		transition: opacity 0.08s cubic-bezier(0.4, 0.0, 0.2, 1);
+		animation: iconReappearCreate 0.1s cubic-bezier(0.4, 0.0, 0.2, 1) 0.12s forwards;
+	}
+
+	@keyframes iconReappearCreate {
+		to {
+			opacity: 1;
+		}
 	}
 
 	.create-note-text {
@@ -835,15 +948,27 @@
 		font-weight: 600;
 		font-size: 14px;
 		margin-left: 12px;
-		opacity: 1;
-		transition: opacity 0.2s ease;
+		white-space: nowrap;
+		transition: 
+			opacity 0.15s cubic-bezier(0.4, 0.0, 0.2, 1),
+			width 0.18s cubic-bezier(0.4, 0.0, 0.2, 1);
 	}
 
 	.create-note-button.collapsed .create-note-text {
 		opacity: 0;
 		width: 0;
 		overflow: hidden;
-		transition: opacity 0.2s ease 0.1s, width 0.2s ease 0.1s;
+		transition: 
+			opacity 0.1s cubic-bezier(0.4, 0.0, 0.2, 1),
+			width 0.18s cubic-bezier(0.4, 0.0, 0.2, 1);
+	}
+
+	.create-note-button:not(.collapsed) .create-note-text {
+		opacity: 1;
+		width: auto;
+		transition: 
+			opacity 0.2s cubic-bezier(0.4, 0.0, 0.2, 1) 0.08s,
+			width 0.18s cubic-bezier(0.4, 0.0, 0.2, 1);
 	}
 
 	/* Скроллбар */
@@ -875,7 +1000,7 @@
 		height: 100vh;
 		border-left: 1px solid #2a2a2a;
 		box-shadow: -2px 0 10px rgba(0, 0, 0, 0.1);
-		transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+		transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
 	}
 
 	.right-sidebar--mobile-open {

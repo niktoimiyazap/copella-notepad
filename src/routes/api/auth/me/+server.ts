@@ -1,6 +1,6 @@
 import { json } from '@sveltejs/kit';
 import { supabase } from '$lib/supabase-server';
-import { prisma } from '$lib/prisma';
+import { prisma, withRetry } from '$lib/prisma';
 import type { RequestHandler } from './$types';
 
 // GET /api/auth/me - получить текущего пользователя
@@ -25,20 +25,20 @@ export const GET: RequestHandler = async ({ request }) => {
 			return json({ error: 'Invalid token' }, { status: 401 });
 		}
 
-		console.log('[API /auth/me] Supabase user:', supabaseUser.email);
+	console.log('[API /auth/me] Supabase user:', supabaseUser.email);
 
-		// Получаем полный профиль из нашей БД
-		const user = await prisma.user.findUnique({
-			where: { id: supabaseUser.id },
-			select: {
-				id: true,
-				email: true,
-				fullName: true,
-				username: true,
-				avatarUrl: true,
-				createdAt: true
-			}
-		});
+	// Получаем полный профиль из нашей БД (с автоматическим retry при проблемах с соединением)
+	const user = await withRetry(() => prisma.user.findUnique({
+		where: { id: supabaseUser.id },
+		select: {
+			id: true,
+			email: true,
+			fullName: true,
+			username: true,
+			avatarUrl: true,
+			createdAt: true
+		}
+	}));
 
 		if (!user) {
 			console.log('[API /auth/me] User not found in DB, returning Supabase data');

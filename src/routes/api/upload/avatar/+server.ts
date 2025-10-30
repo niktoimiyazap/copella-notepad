@@ -1,17 +1,16 @@
 import { json } from '@sveltejs/kit';
 import { prisma } from '$lib/prisma';
 import { createClient } from '@supabase/supabase-js';
-import { getCurrentUserFromToken } from '$lib/utils/userManagement';
 import type { RequestHandler } from './$types';
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 
 // POST: Upload avatar to Supabase Storage
-export const POST: RequestHandler = async ({ request, cookies }) => {
+export const POST: RequestHandler = async ({ request, locals }) => {
   try {
-    // Получаем текущего пользователя
-    const { user, error: authError } = await getCurrentUserFromToken(request, cookies);
-    if (authError || !user) {
+    // Получаем текущего пользователя из locals (установлен в hooks.server.ts)
+    const user = locals.user;
+    if (!user) {
       return json({ error: 'Не авторизован' }, { status: 401 });
     }
 
@@ -107,11 +106,11 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
 };
 
 // DELETE: Remove avatar from Supabase Storage
-export const DELETE: RequestHandler = async ({ request, cookies }) => {
+export const DELETE: RequestHandler = async ({ request, locals }) => {
   try {
-    // Получаем текущего пользователя
-    const { user, error: authError } = await getCurrentUserFromToken(request, cookies);
-    if (authError || !user) {
+    // Получаем текущего пользователя из locals (установлен в hooks.server.ts)
+    const user = locals.user;
+    if (!user) {
       return json({ error: 'Не авторизован' }, { status: 401 });
     }
 

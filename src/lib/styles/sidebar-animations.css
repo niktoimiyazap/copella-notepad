@@ -4,18 +4,37 @@
 
 /* CSS переменные для анимаций */
 :root {
-	--sidebar-duration: 0.3s;
-	--sidebar-easing: cubic-bezier(0.4, 0, 0.2, 1); /* Material Design easing */
-	--sidebar-easing-smooth: cubic-bezier(0.25, 0.46, 0.45, 0.94); /* Более плавная кривая */
+	--sidebar-duration: 0.25s;
+	--sidebar-easing: cubic-bezier(0.4, 0.0, 0.2, 1); /* Material Design Standard */
+	--sidebar-easing-smooth: cubic-bezier(0.0, 0.0, 0.2, 1); /* Material Design Deceleration */
+	--sidebar-easing-emphasized: cubic-bezier(0.2, 0.0, 0, 1); /* Material Design Emphasized */
 }
 
 /* ========================================
    БАЗОВЫЕ АНИМАЦИИ САЙДБАРА
    ======================================== */
 
-/* Плавная анимация ширины */
+/* Плавная анимация ширины с эффектом */
 .sidebar {
 	transition: width var(--sidebar-duration) var(--sidebar-easing);
+}
+
+/* Плавные переходы для всех элементов сайдбара */
+.nav-button {
+	transition: 
+		width var(--sidebar-duration) var(--sidebar-easing),
+		height var(--sidebar-duration) var(--sidebar-easing),
+		padding var(--sidebar-duration) var(--sidebar-easing),
+		background-color 0.2s var(--sidebar-easing),
+		color 0.2s var(--sidebar-easing),
+		justify-content var(--sidebar-duration) var(--sidebar-easing);
+}
+
+.sidebar-logo {
+	transition: 
+		width var(--sidebar-duration) var(--sidebar-easing),
+		height var(--sidebar-duration) var(--sidebar-easing),
+		transform 0.2s var(--sidebar-easing);
 }
 
 /* Анимация transform для мобильных устройств */
@@ -40,68 +59,150 @@
 	transition: padding var(--sidebar-duration) var(--sidebar-easing);
 }
 
+/* Плавная анимация user-info */
+.user-info {
+	transition: 
+		justify-content var(--sidebar-duration) var(--sidebar-easing),
+		gap var(--sidebar-duration) var(--sidebar-easing);
+}
+
 /* ========================================
    АНИМАЦИИ КНОПОК И ЭЛЕМЕНТОВ
    ======================================== */
 
 /* Базовые анимации кнопок */
-.nav-button,
 .room-item {
 	transition: 
 		background-color 0.2s var(--sidebar-easing),
-		transform 0.2s var(--sidebar-easing),
-		color 0.2s var(--sidebar-easing);
+		color 0.2s var(--sidebar-easing),
+		transform 0.2s var(--sidebar-easing);
 }
 
-.nav-button:hover,
 .room-item:hover {
 	background-color: #2A2A2A;
-	transform: translateY(-1px);
 }
 
-/* Исправление для мини-сайдбара - убираем transform для кнопок с абсолютно позиционированными иконками */
-.sidebar--mini .nav-button:hover {
-	transform: none;
-}
-
-/* Анимации иконок - оптимизированные */
+/* Анимации иконок - полное скрытие при переключении */
 .nav-icon,
 .room-icon {
-	transition: 
-		opacity 0.2s var(--sidebar-easing),
-		transform 0.2s var(--sidebar-easing),
-		filter 0.2s var(--sidebar-easing);
+	filter: brightness(0) invert(1);
+}
+
+/* Иконки при смене состояния: плавное скрытие и появление в стиле Material Design */
+.sidebar--mini .nav-icon {
+	animation: iconFadeOutInMini 0.35s cubic-bezier(0.4, 0.0, 0.2, 1);
+}
+
+.sidebar--expanded .nav-icon {
+	animation: iconFadeOutInExpanded 0.35s cubic-bezier(0.4, 0.0, 0.2, 1);
+}
+
+@keyframes iconFadeOutInMini {
+	0% {
+		opacity: 0.5;
+	}
+	15% {
+		opacity: 0;
+	}
+	60% {
+		opacity: 0;
+	}
+	100% {
+		opacity: 0.5;
+	}
+}
+
+@keyframes iconFadeOutInExpanded {
+	0% {
+		opacity: 0.5;
+	}
+	15% {
+		opacity: 0;
+	}
+	60% {
+		opacity: 0;
+	}
+	100% {
+		opacity: 0.5;
+	}
 }
 
 .nav-button:hover .nav-icon,
-.room-item:hover .room-icon {
-	opacity: 1;
-	transform: scale(1.05);
+.room-item:hover .nav-icon {
+	opacity: 1 !important;
 }
 
-/* Исправление для мини-сайдбара - убираем scale для абсолютно позиционированных иконок */
-.sidebar--mini .nav-button:hover .nav-icon {
-	transform: translate(-50%, -50%);
+/* Для primary кнопок - полная видимость */
+.sidebar--mini .nav-button--primary .nav-icon {
+	animation: iconFadeOutInMiniPrimary 0.35s cubic-bezier(0.4, 0.0, 0.2, 1);
+}
+
+.sidebar--expanded .nav-button--primary .nav-icon {
+	animation: iconFadeOutInExpandedPrimary 0.35s cubic-bezier(0.4, 0.0, 0.2, 1);
+}
+
+@keyframes iconFadeOutInMiniPrimary {
+	0% {
+		opacity: 1;
+	}
+	15% {
+		opacity: 0;
+	}
+	60% {
+		opacity: 0;
+	}
+	100% {
+		opacity: 1;
+	}
+}
+
+@keyframes iconFadeOutInExpandedPrimary {
+	0% {
+		opacity: 1;
+	}
+	15% {
+		opacity: 0;
+	}
+	60% {
+		opacity: 0;
+	}
+	100% {
+		opacity: 1;
+	}
 }
 
 /* ========================================
    АНИМАЦИИ ТЕКСТА
    ======================================== */
 
-/* Плавное появление/исчезновение текста - оптимизированное */
+/* Плавное появление/исчезновение текста - Material Design стиль */
 .nav-button span,
 .user-nickname {
+	white-space: nowrap;
 	transition: 
-		opacity 0.2s var(--sidebar-easing) 0.1s,
-		width 0.2s var(--sidebar-easing) 0.1s,
-		transform 0.2s var(--sidebar-easing) 0.1s;
+		opacity 0.2s var(--sidebar-easing-emphasized),
+		width var(--sidebar-duration) var(--sidebar-easing);
 }
 
+/* При сворачивании текст плавно исчезает */
 .sidebar--mini .nav-button span,
 .sidebar--mini .user-nickname {
 	opacity: 0;
 	width: 0;
 	overflow: hidden;
+	transition: 
+		opacity 0.15s var(--sidebar-easing-emphasized),
+		width var(--sidebar-duration) var(--sidebar-easing);
+}
+
+/* При раскрытии текст плавно появляется с задержкой */
+.sidebar--expanded .nav-button span,
+.sidebar--expanded .user-nickname {
+	opacity: 1;
+	width: auto;
+	transition: 
+		opacity 0.25s var(--sidebar-easing-smooth) 0.1s,
+		width var(--sidebar-duration) var(--sidebar-easing);
 }
 
 /* ========================================
@@ -151,8 +252,8 @@
 /* Эффект при нажатии */
 .nav-button:active,
 .room-item:active {
-	transform: translateY(0) scale(0.98);
-	transition: transform 0.1s var(--sidebar-easing);
+	opacity: 0.8;
+	transition: opacity 0.1s var(--sidebar-easing);
 }
 
 /* ========================================

@@ -25,7 +25,11 @@
 	
 	async function loadNotificationSettings() {
 		try {
-			const response = await fetch('/api/settings/notifications');
+			const token = localStorage.getItem('session_token');
+			const response = await fetch('/api/settings/notifications', {
+				headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+				credentials: 'include'
+			});
 			if (response.ok) {
 				const data = await response.json();
 				emailNotifications = data.emailNotifications ?? true;
@@ -75,9 +79,14 @@
 		message = null;
 		
 		try {
+			const token = localStorage.getItem('session_token');
 			const response = await fetch('/api/settings/notifications', {
 				method: 'PATCH',
-				headers: { 'Content-Type': 'application/json' },
+				headers: { 
+					'Content-Type': 'application/json',
+					...(token ? { 'Authorization': `Bearer ${token}` } : {})
+				},
+				credentials: 'include',
 				body: JSON.stringify({
 					emailNotifications,
 					mentionNotifications,
